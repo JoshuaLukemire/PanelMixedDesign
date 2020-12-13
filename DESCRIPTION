@@ -1,0 +1,22 @@
+Package: PanelMixedDesign
+Type: Package
+Title: Approximations to the variance-covariance matrix under the Panel Mixed Logit model
+Version: 0.0.0.9000
+Date: 2020-12-05
+Author: Joshua Lukemire, Wei Zhang
+Maintainer: Joshua Lukemire <joshlukemire@gmail.com>
+Description: Provides serval approximations to the variance-covariance matrix under the Panel Mixed Logit model. These approximations are faster to calculate than using numerical integration, which makes them useful for searching for optimal designs for discrete choice experiments. The package also includes a coordinate exchange algorithm for searching for designs for DCEs using the approximations.
+License: CC0
+Imports:
+  DoE.base,
+  MASS,
+  Matrix,
+  pracma,
+  purrr,
+  Rcpp (>= 1.0.4),
+  RcppEigen,
+  tictoc
+LinkingTo: Rcpp, RcppEigen
+RoxygenNote: 7.1.1
+Suggests: 
+    testthat
