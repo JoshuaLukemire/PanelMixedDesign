@@ -73,3 +73,7 @@ importanceSampleFixedY <- function(Y, X, b_mean, var_vec, nChoiceSet, nU) {
     .Call('_PanelMixedDesign_importanceSampleFixedY', PACKAGE = 'PanelMixedDesign', Y, X, b_mean, var_vec, nChoiceSet, nU)
 }
 
+importanceSample <- function(X, b_mean, var_vec, nChoiceSet, nU, nY) {
+    .Call('_PanelMixedDesign_importanceSample', PACKAGE = 'PanelMixedDesign', X, b_mean, var_vec, nChoiceSet, nU, nY)
+}
+

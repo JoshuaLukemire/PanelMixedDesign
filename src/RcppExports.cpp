@@ -67,12 +67,29 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// importanceSample
+Eigen::MatrixXd importanceSample(Eigen::MatrixXd X, Eigen::VectorXd b_mean, Eigen::VectorXd var_vec, int nChoiceSet, int nU, int nY);
+RcppExport SEXP _PanelMixedDesign_importanceSample(SEXP XSEXP, SEXP b_meanSEXP, SEXP var_vecSEXP, SEXP nChoiceSetSEXP, SEXP nUSEXP, SEXP nYSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Eigen::MatrixXd >::type X(XSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type b_mean(b_meanSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type var_vec(var_vecSEXP);
+    Rcpp::traits::input_parameter< int >::type nChoiceSet(nChoiceSetSEXP);
+    Rcpp::traits::input_parameter< int >::type nU(nUSEXP);
+    Rcpp::traits::input_parameter< int >::type nY(nYSEXP);
+    rcpp_result_gen = Rcpp::wrap(importanceSample(X, b_mean, var_vec, nChoiceSet, nU, nY));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_PanelMixedDesign_laplaceApproximation", (DL_FUNC) &_PanelMixedDesign_laplaceApproximation, 5},
     {"_PanelMixedDesign_MSMApprox", (DL_FUNC) &_PanelMixedDesign_MSMApprox, 5},
     {"_PanelMixedDesign_PQLApprox", (DL_FUNC) &_PanelMixedDesign_PQLApprox, 5},
     {"_PanelMixedDesign_importanceSampleFixedY", (DL_FUNC) &_PanelMixedDesign_importanceSampleFixedY, 6},
+    {"_PanelMixedDesign_importanceSample", (DL_FUNC) &_PanelMixedDesign_importanceSample, 6},
     {NULL, NULL, 0}
 };
 

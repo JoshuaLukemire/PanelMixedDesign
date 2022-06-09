@@ -54,8 +54,9 @@ coordexchpml <- function(nChoiceSet,
     contr=rep('contr.sum',nattr)
     names(contr)=names(designm)
     contr=as.list(contr)
-    
+
     modmat=stats::model.matrix(~.,designm,contrasts = contr)[,-1]  #contr is used to get effects type coding, current coded design
+    
     
     Ic = PMLInfoApprox(modmat,
                        method = approx,
@@ -91,8 +92,11 @@ coordexchpml <- function(nChoiceSet,
     new=matrix()              # new design  
     
     m=1
+    cyc = 0
     while(m!=0){               # if no exchange is made, then m=0
       n=0                                    # number of exchange
+      cyc = cyc + 1
+      print(paste("Design ", r, "cycle", cyc))
       for(i in 1:(sum(cs)*nattr)){            # i goes through all elements in the uncoded design matrix
         
         j=(i%%nattr)                       # column in uncoded design matrix, i.e., jth attribute

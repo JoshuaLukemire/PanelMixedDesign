@@ -3,6 +3,67 @@
 #include "approxutils.h"
 
 
+Eigen::MatrixXd impsamp_SampleY(Eigen::VectorXd expXB,
+                               Eigen::VectorXd X,
+                               int nChoiceSet){
+  
+  int choiceSetSize = X.rows() / nChoiceSet;
+  Eigen::MatrixXd Y = Eigen::MatrixXd::Zero(X.rows(), 1);
+  
+  int ind = 0;
+  double maxval = 0.0;
+  
+  double total_prob = 0.0;
+  double cumu_prob = 0.0;
+  double rdraw = 0.0;
+
+    // Determine the most likely outcome for this sampled Y
+    for (int ic = 0; ic < nChoiceSet; ic++){
+      
+      total_prob = 0.0;
+      for (int ialt = 0; ialt < choiceSetSize; ialt++){
+          total_prob += expXB( ic*choiceSetSize + ialt );
+      }
+
+      ind = 0;
+      double cumu_prob = 0.0;
+      
+      GetRNGstate();
+      rdraw = R::runif(0.0, 1.0);
+      PutRNGstate();
+      
+      for (int ialt = 0; ialt < choiceSetSize; ialt++){
+        cumu_prob += expXB( ic*choiceSetSize + ialt ) / total_prob;
+        if (cumu_prob > rdraw){
+          ind = ic*choiceSetSize + ialt;
+          rdraw = 999.0;
+        }
+      }
+      // Set the most likely Y for this choice set to 1
+      Y(ind, 0) = 1;
+    }
+
+  return Y;
+}
+
+
+
+
+
+
+Eigen::VectorXd impsamp_SampleEpsilon(int totalAlternatives){
+  Eigen::VectorXd eps = Eigen::VectorXd::Zero(totalAlternatives);
+  GetRNGstate();
+  for (int ii = 0; ii < totalAlternatives; ii++){
+    eps(ii) = R::runif(0.0, 1.0);
+  }
+  PutRNGstate();
+  eps = (eps.array().log() * (-1.0) ).log() * (-1.0);
+  return eps;
+}
+
+
+
 // [[Rcpp::depends(RcppEigen)]]
 
 Eigen::VectorXd impsamp_calc_marginal_prob(Eigen::VectorXd Y, Eigen::MatrixXd probs,
@@ -30,8 +91,12 @@ Eigen::VectorXd impsamp_calc_marginal_prob(Eigen::VectorXd Y, Eigen::MatrixXd pr
 
 
 
-Eigen::MatrixXd impsamp_calc_info_given_Y(Eigen::VectorXd Y, Eigen::MatrixXd X, Eigen::VectorXd b_mean,
-                                          Eigen::VectorXd var_vec, int nChoiceSet, int nU){
+Eigen::MatrixXd impsamp_calc_info_given_Y(Eigen::VectorXd Y,
+                                          Eigen::MatrixXd X,
+                                          Eigen::VectorXd b_mean,
+                                          Eigen::VectorXd var_vec,
+                                          int nChoiceSet,
+                                          int nU){
   
   int nRandEffect = 0;
   for (int i = 0; i < var_vec.size(); i++){
@@ -147,6 +212,42 @@ Eigen::MatrixXd importanceSampleFixedY(Eigen::MatrixXd Y,
   
   for (int iY = 0; iY < nY; iY++){
     FI += impsamp_calc_info_given_Y(Y.col(iY), X, b_mean, var_vec, nChoiceSet, nU);
+  }
+  
+  return FI;
+  
+}
+
+
+
+
+// [[Rcpp::export]]
+Eigen::MatrixXd importanceSample(     Eigen::MatrixXd X,
+                                       Eigen::VectorXd b_mean,
+                                       Eigen::VectorXd var_vec, int nChoiceSet, int nU, int nY){
+  
+  int nRandEffect = 0;
+  for (int i = 0; i < var_vec.size(); i++){
+    if (var_vec(i) > 0){
+      nRandEffect++;
+    }
+  }
+  
+  Eigen::MatrixXd FI = Eigen::MatrixXd::Zero(b_mean.size() + nRandEffect, b_mean.size() + nRandEffect);
+  Eigen::MatrixXd Y  = Eigen::MatrixXd::Zero(X.rows(), 1);
+  Eigen::MatrixXd epsilon = Eigen::MatrixXd::Zero(X.rows(), 1);
+  //Eigen::VectorXd XB    = Eigen::VectorXd::Zero(X.rows());
+  Eigen::VectorXd expXB = Eigen::VectorXd::Zero(X.rows());
+  
+  Eigen::VectorXd XB    = Eigen::VectorXd::Ones(X.rows());
+  
+  
+  for (int iY = 0; iY < nY; iY++){
+    epsilon.col(0) = impsamp_SampleEpsilon(X.rows());
+    XB    = X * b_mean + epsilon.col(0);
+    expXB = XB.array().exp();
+    Y  = impsamp_SampleY(expXB, X, nChoiceSet);
+    FI += impsamp_calc_info_given_Y(Y.col(0), X, b_mean, var_vec, nChoiceSet, nU);
   }
   
   return FI;

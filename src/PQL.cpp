@@ -167,6 +167,7 @@ Eigen::MatrixXd PQLApprox(int nu,
     u0_mle    = u.col(iy);
     converged = false;
     
+    //std::cout << "========" << std::endl;
     
     for(int inewton_iter = 0; inewton_iter < max_iter; inewton_iter++){
       
@@ -182,22 +183,25 @@ Eigen::MatrixXd PQLApprox(int nu,
       
       delta = calcDelta(prob, nChoiceSet);
       
+      
       // from all rand effects verison
       gradient = Xr.transpose() * (Y - prob) -  OmegaRE * u0_mle;
       
       H = -(Xr.transpose() * delta * Xr) - OmegaRE; 
       
-      stepsize = 1.0 / (1.0 + 10.0 * sqrt(gradient.array().pow(2).sum() ) );
+      //stepsize = 1.0 / (1.0 + 10.0 * sqrt(gradient.array().pow(2).sum() ) );
+      stepsize = 1.0;
       
       Hinv = H.inverse();
       
       u1_mle = u0_mle - stepsize*(Hinv * gradient);
       
-      
       iterchange = 0.0;
       for (int ib = 0; ib < u1_mle.size(); ib++){
         iterchange += sqrt(pow(u1_mle(ib) - u0_mle(ib), 2));
       }
+      
+      //std::cout << iterchange << std::endl;
       
       if ( iterchange < tol ){
         converged = true;
@@ -236,6 +240,9 @@ Eigen::MatrixXd PQLApprox(int nu,
     
     
   } // end of loop over Y
+  
+  //std::cout << nu_converged << std::endl;
+  
   
   fisherInfo.block(0, 0, nBeta, nBeta) = I11;
   fisherInfo.block(0, nBeta, nBeta, nRandEffect) = I12;

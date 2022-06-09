@@ -167,7 +167,8 @@ Eigen::MatrixXd laplaceNewtonMethod(Eigen::MatrixXd Yall,
       
       H = -(XR.transpose() * delta * XR) - OmegaRE; // this is Wei's version
       
-      stepsize = 1.0 / (1.0 + 10.0 * sqrt(gradient.array().pow(2).sum() ) );
+      //stepsize = 1.0 / (1.0 + 10.0 * sqrt(gradient.array().pow(2).sum() ) );
+      stepsize = 1.0;
       
       Hinv = H.inverse();
       
@@ -246,7 +247,8 @@ Eigen::MatrixXd laplaceNewtonMethod(Eigen::MatrixXd Yall,
           
           Hinv = H.inverse();
           
-          stepsize = 1 / (1 + 10 * sqrt(gradient.array().pow(2).sum() ) );
+          //stepsize = 1 / (1 + 10 * sqrt(gradient.array().pow(2).sum() ) );
+          stepsize = 1.0;
           
           u1_mle = u0_mle - stepsize*(Hinv * gradient);
           
@@ -328,7 +330,8 @@ Eigen::MatrixXd laplaceNewtonMethod(Eigen::MatrixXd Yall,
           
           Hinv = H.inverse();
           
-          stepsize = 1 / (1 + 10 * sqrt(gradient.array().pow(2).sum()) );
+          //stepsize = 1 / (1 + 10 * sqrt(gradient.array().pow(2).sum()) );
+          stepsize = 1.0;
           
           u1_mle = u0_mle - stepsize*(Hinv * gradient);
           

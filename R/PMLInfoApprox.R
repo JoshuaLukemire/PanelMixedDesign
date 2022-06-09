@@ -99,11 +99,13 @@ PMLInfoApprox <- function(X,
   } else if (pracma::strcmpi(method, "Importance")){
     
     if (is.null(Y)){
-      stop("Argument: Y must be provided for importance sampling. Y can be generated
-           usign the gen_all_choice_seq function.")
+      #stop("Argument: Y must be provided for importance sampling. Y can be generated
+      #     usign the gen_all_choice_seq function.")
+      InfoApprox <- importanceSample(X, b_mean, b_var, nChoiceSet, opts$nU, opts$nY)
+    } else {
+      InfoApprox <- importanceSampleFixedY(Y, X, b_mean, b_var, nChoiceSet, opts$nU)
     }
-    InfoApprox <- importanceSampleFixedY(Y, X, b_mean, b_var, nChoiceSet, opts$nU)
-    
+
   } else if (pracma::strcmpi(method, "MSM")){
     
     InfoApproxTemp <- MSMApprox(opts$nU, X, b_mean, b_var, nChoiceSet)
