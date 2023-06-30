@@ -538,3 +538,259 @@ Eigen::MatrixXd laplaceApproximation(int ny,
   return infoApprox;
   
 }
+
+
+
+
+// [[Rcpp::export]]
+void laplace_set_maxprob_Y_inplace(Eigen::Map<Eigen::MatrixXd> & Y,
+                                   const Eigen::Map<Eigen::MatrixXd> & expXB,
+                                   int choice_set_size){
+  
+  
+  size_t ny = Y.cols();
+  size_t n_choice_set = Y.rows() / choice_set_size;
+  int yind = 0;
+  
+  // Loop over ny
+  for (int iy = 0; iy < ny; iy++){
+
+    // As a starting value, pick the most likely Y for each choice set
+    for (int ichoice = 0; ichoice < n_choice_set; ichoice++){
+      yind=0;
+      // Find the selected value for this choice set
+      for (int ialt = 1; ialt < choice_set_size; ialt++){
+        if (expXB(ichoice*choice_set_size + ialt, iy) > expXB(ichoice*choice_set_size + yind, iy)) {
+          yind = ialt;
+        }
+      }
+      Y(ichoice*choice_set_size + yind, iy) = 1;
+    }
+  } // /iy
+  
+}
+
+// [[Rcpp::export]]
+double laplace_u1_fn_minimize(const Eigen::Map<Eigen::VectorXd> & u0_mle,
+                              const Eigen::Map<Eigen::VectorXd> & b_mean,
+                              const Eigen::Map<Eigen::MatrixXd> & OmegaRE,
+                              const Eigen::Map<Eigen::MatrixXd> & X,
+                              Eigen::Map<Eigen::VectorXd> & beta,
+                              Eigen::Map<Eigen::VectorXd> & prob,
+                              int nRandEffect,
+                              int nFixedEffect,
+                              int nChoiceSet){
+  double out = 0.0;
+  
+  beta.segment(0, nRandEffect)            = b_mean.segment(0, nRandEffect) + u0_mle;
+  beta.segment(nRandEffect, nFixedEffect) = b_mean.segment(nRandEffect, nFixedEffect);
+  
+  // Calculate response probabilities under U0_MLE
+  prob = calculateResponseProbs(X,
+                                beta,
+                                nChoiceSet);
+  
+  out = prob.sum() - (u0_mle.transpose() * OmegaRE * u0_mle);
+  
+  /*
+  delta = calcDelta(prob,
+                    n_choice_set);
+  
+  gradient = XR.transpose() * (Y - prob) -  OmegaRE * u0_mle;
+  
+  H = -(XR.transpose() * delta * XR) - OmegaRE; // this is Wei's version
+   */
+  
+  return(-out);
+}
+
+// [[Rcpp::export]]
+double laplace_u1_gr_minimize(const Eigen::Map<Eigen::VectorXd> & u0_mle,
+                              const Eigen::Map<Eigen::VectorXd> & b_mean,
+                              const Eigen::Map<Eigen::VectorXd> & OmegaRE,
+                              const Eigen::Map<Eigen::MatrixXd> & X,
+                              Eigen::Map<Eigen::VectorXd> & beta,
+                              Eigen::Map<Eigen::VectorXd> & prob,
+                              int nRandEffect,
+                              int nFixedEffect,
+                              int nChoiceSet){
+  double out = 0.0;
+  
+  beta.segment(0, nRandEffect)            = b_mean.segment(0, nRandEffect) + u0_mle;
+  beta.segment(nRandEffect, nFixedEffect) = b_mean.segment(nRandEffect, nFixedEffect);
+  
+  // Calculate response probabilities under U0_MLE
+  prob = calculateResponseProbs(X,
+                                beta,
+                                nChoiceSet);
+  
+  //delta = calcDelta(prob, n_choice_set);
+  
+  //out = (XR.transpose() * delta * XR) + OmegaRE;
+  
+  return(-out);
+}
+
+
+
+
+
+// [[Rcpp::export]]
+double laplace_usj_fn_minimize(const Eigen::Map<Eigen::VectorXd> & u0_mle,
+                               const Eigen::Map<Eigen::VectorXd> & b_mean,
+                               const Eigen::Map<Eigen::MatrixXd> & OmegaRE,
+                               const Eigen::Map<Eigen::MatrixXd> & X,
+                               Eigen::Map<Eigen::VectorXd> & beta,
+                               Eigen::Map<Eigen::VectorXd> & prob,
+                               int nRandEffect,
+                               int nFixedEffect,
+                               int nChoiceSet,
+                               int irow,
+                               int iCS,
+                               int choice_set_size,
+                               const Eigen::Map<Eigen::MatrixXd> & X_cs_rdm){
+  double out = 0.0;
+  
+  beta.segment(0, nRandEffect)            = b_mean.segment(0, nRandEffect) + u0_mle;
+  beta.segment(nRandEffect, nFixedEffect) = b_mean.segment(nRandEffect, nFixedEffect);
+  
+  Eigen::VectorXd pj = Eigen::VectorXd::Zero(choice_set_size);
+  
+  // Calculate response probabilities under U0_MLE
+  prob = calculateResponseProbs(X,
+                                beta,
+                                nChoiceSet);
+  
+  pj = prob.block(iCS*choice_set_size, 0, choice_set_size, 1).array();
+  pj(irow % choice_set_size) = -1.0 + pj(irow % choice_set_size);
+  pj *= -1.0;
+  
+  //std::cout <<  (u0_mle.transpose() * OmegaRE * u0_mle) << std::endl;
+  
+  out = pj(irow % choice_set_size) + prob.sum() - (0.5 * u0_mle.transpose() * OmegaRE * u0_mle);
+  
+  return(-out);
+}
+
+// [[Rcpp::export]]
+Eigen::MatrixXd laplace_usj_evaluate_H(const Eigen::Map<Eigen::VectorXd> & u0j_mle,
+                               const Eigen::Map<Eigen::VectorXd> & b_mean,
+                               const Eigen::Map<Eigen::MatrixXd> & OmegaRE,
+                               const Eigen::Map<Eigen::MatrixXd> & X,
+                               const Eigen::Map<Eigen::MatrixXd> & XR,
+                               Eigen::Map<Eigen::VectorXd> & beta,
+                               Eigen::Map<Eigen::VectorXd> & prob,
+                               int nRandEffect,
+                               int nFixedEffect,
+                               int nChoiceSet,
+                               int irow,
+                               int iCS,
+                               int choice_set_size,
+                               const Eigen::Map<Eigen::MatrixXd> & X_cs_rdm){
+
+  beta.segment(0, nRandEffect)            = b_mean.segment(0, nRandEffect) + u0j_mle;
+  beta.segment(nRandEffect, nFixedEffect) = b_mean.segment(nRandEffect, nFixedEffect);
+  
+  Eigen::VectorXd pj = Eigen::VectorXd::Zero(choice_set_size);
+  
+  // Calculate response probabilities under U0_MLE
+  prob = calculateResponseProbs(X,
+                                beta,
+                                nChoiceSet);
+  
+  Eigen::MatrixXd delta = calcDelta(prob, nChoiceSet);
+  
+  Eigen::MatrixXd H = -(
+    X_cs_rdm.transpose() * 
+      delta.block(iCS*choice_set_size, iCS*choice_set_size,
+                  choice_set_size, choice_set_size) *
+                    X_cs_rdm
+  ) - (XR.transpose() * delta * XR ) - OmegaRE;
+  
+  
+  return(H);
+}
+
+
+
+
+
+
+// [[Rcpp::export]]
+double laplace_uj_fn_minimize(const Eigen::Map<Eigen::VectorXd> & u,
+                               const Eigen::Map<Eigen::VectorXd> & b_mean,
+                               const Eigen::Map<Eigen::VectorXd> & sigma_re,
+                               const Eigen::Map<Eigen::MatrixXd> & OmegaRE,
+                               const Eigen::Map<Eigen::MatrixXd> & X,
+                               Eigen::Map<Eigen::VectorXd> & beta,
+                               Eigen::Map<Eigen::VectorXd> & prob,
+                               double constant_term,
+                               int nRandEffect,
+                               int nFixedEffect,
+                               int nChoiceSet,
+                               int iRE,
+                               int choice_set_size,
+                               const Eigen::Map<Eigen::MatrixXd> & X_cs_rdm){
+  double out = 0.0;
+  
+  beta.segment(0, nRandEffect)            = b_mean.segment(0, nRandEffect) + u;
+  beta.segment(nRandEffect, nFixedEffect) = b_mean.segment(nRandEffect, nFixedEffect);
+  
+  // Calculate response probabilities under u
+  prob = calculateResponseProbs(X,
+                                beta,
+                                nChoiceSet);
+  
+  //Eigen::MatrixXd delta = calcDelta(prob, nChoiceSet);
+  
+  double ratio_term = pow(u(iRE), 2) + constant_term * pow(sigma_re(iRE), 3);
+  ratio_term = ratio_term /  pow(sigma_re(iRE), 3);
+
+  out = log(ratio_term) + prob.sum() - (0.5 * u.transpose() * OmegaRE * u);
+
+  return(-out);
+}
+
+// [[Rcpp::export]]
+Eigen::MatrixXd laplace_uj_evaluate_H(const Eigen::Map<Eigen::VectorXd> & u,
+                                       const Eigen::Map<Eigen::VectorXd> & b_mean,
+                                       const Eigen::Map<Eigen::MatrixXd> & OmegaRE,
+                                       const Eigen::Map<Eigen::VectorXd> & sigma_re,
+                                       const Eigen::Map<Eigen::MatrixXd> & X,
+                                       const Eigen::Map<Eigen::MatrixXd> & XR,
+                                       Eigen::Map<Eigen::VectorXd> & beta,
+                                       Eigen::Map<Eigen::VectorXd> & prob,
+                                       int nRandEffect,
+                                       int nFixedEffect,
+                                       int nChoiceSet,
+                                       int iRE,
+                                       int choice_set_size,
+                                       const Eigen::Map<Eigen::MatrixXd> & X_cs_rdm,
+                                       double constant_term){
+  
+  beta.segment(0, nRandEffect)            = b_mean.segment(0, nRandEffect) + u;
+  beta.segment(nRandEffect, nFixedEffect) = b_mean.segment(nRandEffect, nFixedEffect);
+  
+  Eigen::VectorXd Ej = Eigen::VectorXd::Zero(nRandEffect);
+  Ej(iRE) = 1.0;
+  
+  // Calculate response probabilities under U0_MLE
+  prob = calculateResponseProbs(X,
+                                beta,
+                                nChoiceSet);
+  
+  Eigen::MatrixXd delta = calcDelta(prob, nChoiceSet);
+  
+  Eigen::MatrixXd EEt = Ej * Ej.transpose();
+  
+  // 
+  double ratio_num = 2 * (constant_term * pow(sigma_re(iRE), 3) - pow(u(iRE), 2));
+  double ratio_denom = pow(  pow(u(iRE), 2) + constant_term * pow(sigma_re(iRE), 3), 2 );
+  double ratio_term = ratio_num / ratio_denom;
+  
+  Eigen::MatrixXd H = ratio_term * EEt;
+  H  = H - (XR.transpose() * delta * XR ) - OmegaRE;
+  
+  
+  return(H);
+}

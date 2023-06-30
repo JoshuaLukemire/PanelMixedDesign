@@ -17,6 +17,34 @@ laplaceApproximation <- function(ny, X, b_mean, var_vec, n_choice_set) {
     .Call('_PanelMixedDesign_laplaceApproximation', PACKAGE = 'PanelMixedDesign', ny, X, b_mean, var_vec, n_choice_set)
 }
 
+laplace_set_maxprob_Y_inplace <- function(Y, expXB, choice_set_size) {
+    invisible(.Call('_PanelMixedDesign_laplace_set_maxprob_Y_inplace', PACKAGE = 'PanelMixedDesign', Y, expXB, choice_set_size))
+}
+
+laplace_u1_fn_minimize <- function(u0_mle, b_mean, OmegaRE, X, beta, prob, nRandEffect, nFixedEffect, nChoiceSet) {
+    .Call('_PanelMixedDesign_laplace_u1_fn_minimize', PACKAGE = 'PanelMixedDesign', u0_mle, b_mean, OmegaRE, X, beta, prob, nRandEffect, nFixedEffect, nChoiceSet)
+}
+
+laplace_u1_gr_minimize <- function(u0_mle, b_mean, OmegaRE, X, beta, prob, nRandEffect, nFixedEffect, nChoiceSet) {
+    .Call('_PanelMixedDesign_laplace_u1_gr_minimize', PACKAGE = 'PanelMixedDesign', u0_mle, b_mean, OmegaRE, X, beta, prob, nRandEffect, nFixedEffect, nChoiceSet)
+}
+
+laplace_usj_fn_minimize <- function(u0_mle, b_mean, OmegaRE, X, beta, prob, nRandEffect, nFixedEffect, nChoiceSet, irow, iCS, choice_set_size, X_cs_rdm) {
+    .Call('_PanelMixedDesign_laplace_usj_fn_minimize', PACKAGE = 'PanelMixedDesign', u0_mle, b_mean, OmegaRE, X, beta, prob, nRandEffect, nFixedEffect, nChoiceSet, irow, iCS, choice_set_size, X_cs_rdm)
+}
+
+laplace_usj_evaluate_H <- function(u0j_mle, b_mean, OmegaRE, X, XR, beta, prob, nRandEffect, nFixedEffect, nChoiceSet, irow, iCS, choice_set_size, X_cs_rdm) {
+    .Call('_PanelMixedDesign_laplace_usj_evaluate_H', PACKAGE = 'PanelMixedDesign', u0j_mle, b_mean, OmegaRE, X, XR, beta, prob, nRandEffect, nFixedEffect, nChoiceSet, irow, iCS, choice_set_size, X_cs_rdm)
+}
+
+laplace_uj_fn_minimize <- function(u, b_mean, sigma_re, OmegaRE, X, beta, prob, constant_term, nRandEffect, nFixedEffect, nChoiceSet, iRE, choice_set_size, X_cs_rdm) {
+    .Call('_PanelMixedDesign_laplace_uj_fn_minimize', PACKAGE = 'PanelMixedDesign', u, b_mean, sigma_re, OmegaRE, X, beta, prob, constant_term, nRandEffect, nFixedEffect, nChoiceSet, iRE, choice_set_size, X_cs_rdm)
+}
+
+laplace_uj_evaluate_H <- function(u, b_mean, OmegaRE, sigma_re, X, XR, beta, prob, nRandEffect, nFixedEffect, nChoiceSet, iRE, choice_set_size, X_cs_rdm, constant_term) {
+    .Call('_PanelMixedDesign_laplace_uj_evaluate_H', PACKAGE = 'PanelMixedDesign', u, b_mean, OmegaRE, sigma_re, X, XR, beta, prob, nRandEffect, nFixedEffect, nChoiceSet, iRE, choice_set_size, X_cs_rdm, constant_term)
+}
+
 #' Approximation to the information matrix using the method of simulated moments
 #'
 #' @description Approximates the information matrix for the model parameters 
@@ -53,6 +81,26 @@ PQLApprox <- function(nu, X, b_mean, var_vec, nChoiceSet) {
     .Call('_PanelMixedDesign_PQLApprox', PACKAGE = 'PanelMixedDesign', nu, X, b_mean, var_vec, nChoiceSet)
 }
 
+normalizeProbabilities <- function(probs, n_choice) {
+    .Call('_PanelMixedDesign_normalizeProbabilities', PACKAGE = 'PanelMixedDesign', probs, n_choice)
+}
+
+update_response_probabilities_inplace <- function(prob, X, beta, n_choice) {
+    invisible(.Call('_PanelMixedDesign_update_response_probabilities_inplace', PACKAGE = 'PanelMixedDesign', prob, X, beta, n_choice))
+}
+
+update_delta_inplace <- function(delta, p, n_choice_set) {
+    invisible(.Call('_PanelMixedDesign_update_delta_inplace', PACKAGE = 'PanelMixedDesign', delta, p, n_choice_set))
+}
+
+impsamp_calc_info_given_Y <- function(Y, X, b_mean, var_vec, nChoiceSet, nU, return_unweighted, marginal_prob_store) {
+    .Call('_PanelMixedDesign_impsamp_calc_info_given_Y', PACKAGE = 'PanelMixedDesign', Y, X, b_mean, var_vec, nChoiceSet, nU, return_unweighted, marginal_prob_store)
+}
+
+R_impsamp_calc_info_given_Y <- function(Y, X, b_mean, var_vec, nChoiceSet, nU, return_unweighted, marginal_prob_store) {
+    .Call('_PanelMixedDesign_R_impsamp_calc_info_given_Y', PACKAGE = 'PanelMixedDesign', Y, X, b_mean, var_vec, nChoiceSet, nU, return_unweighted, marginal_prob_store)
+}
+
 #' Approximate the information matrix using importance sampling
 #'
 #' @description Approximates the information matrix for the model parameters 
@@ -75,5 +123,13 @@ importanceSampleFixedY <- function(Y, X, b_mean, var_vec, nChoiceSet, nU) {
 
 importanceSample <- function(X, b_mean, var_vec, nChoiceSet, nU, nY) {
     .Call('_PanelMixedDesign_importanceSample', PACKAGE = 'PanelMixedDesign', X, b_mean, var_vec, nChoiceSet, nU, nY)
+}
+
+impsamp_calc_conditional_prob_vector_inplace_R <- function(condProbs, Y, probs, nChoiceSet) {
+    invisible(.Call('_PanelMixedDesign_impsamp_calc_conditional_prob_vector_inplace_R', PACKAGE = 'PanelMixedDesign', condProbs, Y, probs, nChoiceSet))
+}
+
+impsamp_update_easy_terms_inplace <- function(Delta, PPt, PRatiosT, responseProbs, U22, X, b_mean, var_vec, nChoiceSet, nU) {
+    invisible(.Call('_PanelMixedDesign_impsamp_update_easy_terms_inplace', PACKAGE = 'PanelMixedDesign', Delta, PPt, PRatiosT, responseProbs, U22, X, b_mean, var_vec, nChoiceSet, nU))
 }
 

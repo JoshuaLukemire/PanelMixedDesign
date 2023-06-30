@@ -6,6 +6,11 @@
 
 using namespace Rcpp;
 
+#ifdef RCPP_USE_GLOBAL_ROSTREAM
+Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
+Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
+#endif
+
 // laplaceApproximation
 Eigen::MatrixXd laplaceApproximation(int ny, Eigen::MatrixXd X, Eigen::VectorXd b_mean, Eigen::VectorXd var_vec, int n_choice_set);
 RcppExport SEXP _PanelMixedDesign_laplaceApproximation(SEXP nySEXP, SEXP XSEXP, SEXP b_meanSEXP, SEXP var_vecSEXP, SEXP n_choice_setSEXP) {
@@ -18,6 +23,152 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< Eigen::VectorXd >::type var_vec(var_vecSEXP);
     Rcpp::traits::input_parameter< int >::type n_choice_set(n_choice_setSEXP);
     rcpp_result_gen = Rcpp::wrap(laplaceApproximation(ny, X, b_mean, var_vec, n_choice_set));
+    return rcpp_result_gen;
+END_RCPP
+}
+// laplace_set_maxprob_Y_inplace
+void laplace_set_maxprob_Y_inplace(Eigen::Map<Eigen::MatrixXd>& Y, const Eigen::Map<Eigen::MatrixXd>& expXB, int choice_set_size);
+RcppExport SEXP _PanelMixedDesign_laplace_set_maxprob_Y_inplace(SEXP YSEXP, SEXP expXBSEXP, SEXP choice_set_sizeSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::MatrixXd>& >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type expXB(expXBSEXP);
+    Rcpp::traits::input_parameter< int >::type choice_set_size(choice_set_sizeSEXP);
+    laplace_set_maxprob_Y_inplace(Y, expXB, choice_set_size);
+    return R_NilValue;
+END_RCPP
+}
+// laplace_u1_fn_minimize
+double laplace_u1_fn_minimize(const Eigen::Map<Eigen::VectorXd>& u0_mle, const Eigen::Map<Eigen::VectorXd>& b_mean, const Eigen::Map<Eigen::MatrixXd>& OmegaRE, const Eigen::Map<Eigen::MatrixXd>& X, Eigen::Map<Eigen::VectorXd>& beta, Eigen::Map<Eigen::VectorXd>& prob, int nRandEffect, int nFixedEffect, int nChoiceSet);
+RcppExport SEXP _PanelMixedDesign_laplace_u1_fn_minimize(SEXP u0_mleSEXP, SEXP b_meanSEXP, SEXP OmegaRESEXP, SEXP XSEXP, SEXP betaSEXP, SEXP probSEXP, SEXP nRandEffectSEXP, SEXP nFixedEffectSEXP, SEXP nChoiceSetSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type u0_mle(u0_mleSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type b_mean(b_meanSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type OmegaRE(OmegaRESEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type prob(probSEXP);
+    Rcpp::traits::input_parameter< int >::type nRandEffect(nRandEffectSEXP);
+    Rcpp::traits::input_parameter< int >::type nFixedEffect(nFixedEffectSEXP);
+    Rcpp::traits::input_parameter< int >::type nChoiceSet(nChoiceSetSEXP);
+    rcpp_result_gen = Rcpp::wrap(laplace_u1_fn_minimize(u0_mle, b_mean, OmegaRE, X, beta, prob, nRandEffect, nFixedEffect, nChoiceSet));
+    return rcpp_result_gen;
+END_RCPP
+}
+// laplace_u1_gr_minimize
+double laplace_u1_gr_minimize(const Eigen::Map<Eigen::VectorXd>& u0_mle, const Eigen::Map<Eigen::VectorXd>& b_mean, const Eigen::Map<Eigen::VectorXd>& OmegaRE, const Eigen::Map<Eigen::MatrixXd>& X, Eigen::Map<Eigen::VectorXd>& beta, Eigen::Map<Eigen::VectorXd>& prob, int nRandEffect, int nFixedEffect, int nChoiceSet);
+RcppExport SEXP _PanelMixedDesign_laplace_u1_gr_minimize(SEXP u0_mleSEXP, SEXP b_meanSEXP, SEXP OmegaRESEXP, SEXP XSEXP, SEXP betaSEXP, SEXP probSEXP, SEXP nRandEffectSEXP, SEXP nFixedEffectSEXP, SEXP nChoiceSetSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type u0_mle(u0_mleSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type b_mean(b_meanSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type OmegaRE(OmegaRESEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type prob(probSEXP);
+    Rcpp::traits::input_parameter< int >::type nRandEffect(nRandEffectSEXP);
+    Rcpp::traits::input_parameter< int >::type nFixedEffect(nFixedEffectSEXP);
+    Rcpp::traits::input_parameter< int >::type nChoiceSet(nChoiceSetSEXP);
+    rcpp_result_gen = Rcpp::wrap(laplace_u1_gr_minimize(u0_mle, b_mean, OmegaRE, X, beta, prob, nRandEffect, nFixedEffect, nChoiceSet));
+    return rcpp_result_gen;
+END_RCPP
+}
+// laplace_usj_fn_minimize
+double laplace_usj_fn_minimize(const Eigen::Map<Eigen::VectorXd>& u0_mle, const Eigen::Map<Eigen::VectorXd>& b_mean, const Eigen::Map<Eigen::MatrixXd>& OmegaRE, const Eigen::Map<Eigen::MatrixXd>& X, Eigen::Map<Eigen::VectorXd>& beta, Eigen::Map<Eigen::VectorXd>& prob, int nRandEffect, int nFixedEffect, int nChoiceSet, int irow, int iCS, int choice_set_size, const Eigen::Map<Eigen::MatrixXd>& X_cs_rdm);
+RcppExport SEXP _PanelMixedDesign_laplace_usj_fn_minimize(SEXP u0_mleSEXP, SEXP b_meanSEXP, SEXP OmegaRESEXP, SEXP XSEXP, SEXP betaSEXP, SEXP probSEXP, SEXP nRandEffectSEXP, SEXP nFixedEffectSEXP, SEXP nChoiceSetSEXP, SEXP irowSEXP, SEXP iCSSEXP, SEXP choice_set_sizeSEXP, SEXP X_cs_rdmSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type u0_mle(u0_mleSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type b_mean(b_meanSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type OmegaRE(OmegaRESEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type prob(probSEXP);
+    Rcpp::traits::input_parameter< int >::type nRandEffect(nRandEffectSEXP);
+    Rcpp::traits::input_parameter< int >::type nFixedEffect(nFixedEffectSEXP);
+    Rcpp::traits::input_parameter< int >::type nChoiceSet(nChoiceSetSEXP);
+    Rcpp::traits::input_parameter< int >::type irow(irowSEXP);
+    Rcpp::traits::input_parameter< int >::type iCS(iCSSEXP);
+    Rcpp::traits::input_parameter< int >::type choice_set_size(choice_set_sizeSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type X_cs_rdm(X_cs_rdmSEXP);
+    rcpp_result_gen = Rcpp::wrap(laplace_usj_fn_minimize(u0_mle, b_mean, OmegaRE, X, beta, prob, nRandEffect, nFixedEffect, nChoiceSet, irow, iCS, choice_set_size, X_cs_rdm));
+    return rcpp_result_gen;
+END_RCPP
+}
+// laplace_usj_evaluate_H
+Eigen::MatrixXd laplace_usj_evaluate_H(const Eigen::Map<Eigen::VectorXd>& u0j_mle, const Eigen::Map<Eigen::VectorXd>& b_mean, const Eigen::Map<Eigen::MatrixXd>& OmegaRE, const Eigen::Map<Eigen::MatrixXd>& X, const Eigen::Map<Eigen::MatrixXd>& XR, Eigen::Map<Eigen::VectorXd>& beta, Eigen::Map<Eigen::VectorXd>& prob, int nRandEffect, int nFixedEffect, int nChoiceSet, int irow, int iCS, int choice_set_size, const Eigen::Map<Eigen::MatrixXd>& X_cs_rdm);
+RcppExport SEXP _PanelMixedDesign_laplace_usj_evaluate_H(SEXP u0j_mleSEXP, SEXP b_meanSEXP, SEXP OmegaRESEXP, SEXP XSEXP, SEXP XRSEXP, SEXP betaSEXP, SEXP probSEXP, SEXP nRandEffectSEXP, SEXP nFixedEffectSEXP, SEXP nChoiceSetSEXP, SEXP irowSEXP, SEXP iCSSEXP, SEXP choice_set_sizeSEXP, SEXP X_cs_rdmSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type u0j_mle(u0j_mleSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type b_mean(b_meanSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type OmegaRE(OmegaRESEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type XR(XRSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type prob(probSEXP);
+    Rcpp::traits::input_parameter< int >::type nRandEffect(nRandEffectSEXP);
+    Rcpp::traits::input_parameter< int >::type nFixedEffect(nFixedEffectSEXP);
+    Rcpp::traits::input_parameter< int >::type nChoiceSet(nChoiceSetSEXP);
+    Rcpp::traits::input_parameter< int >::type irow(irowSEXP);
+    Rcpp::traits::input_parameter< int >::type iCS(iCSSEXP);
+    Rcpp::traits::input_parameter< int >::type choice_set_size(choice_set_sizeSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type X_cs_rdm(X_cs_rdmSEXP);
+    rcpp_result_gen = Rcpp::wrap(laplace_usj_evaluate_H(u0j_mle, b_mean, OmegaRE, X, XR, beta, prob, nRandEffect, nFixedEffect, nChoiceSet, irow, iCS, choice_set_size, X_cs_rdm));
+    return rcpp_result_gen;
+END_RCPP
+}
+// laplace_uj_fn_minimize
+double laplace_uj_fn_minimize(const Eigen::Map<Eigen::VectorXd>& u, const Eigen::Map<Eigen::VectorXd>& b_mean, const Eigen::Map<Eigen::VectorXd>& sigma_re, const Eigen::Map<Eigen::MatrixXd>& OmegaRE, const Eigen::Map<Eigen::MatrixXd>& X, Eigen::Map<Eigen::VectorXd>& beta, Eigen::Map<Eigen::VectorXd>& prob, double constant_term, int nRandEffect, int nFixedEffect, int nChoiceSet, int iRE, int choice_set_size, const Eigen::Map<Eigen::MatrixXd>& X_cs_rdm);
+RcppExport SEXP _PanelMixedDesign_laplace_uj_fn_minimize(SEXP uSEXP, SEXP b_meanSEXP, SEXP sigma_reSEXP, SEXP OmegaRESEXP, SEXP XSEXP, SEXP betaSEXP, SEXP probSEXP, SEXP constant_termSEXP, SEXP nRandEffectSEXP, SEXP nFixedEffectSEXP, SEXP nChoiceSetSEXP, SEXP iRESEXP, SEXP choice_set_sizeSEXP, SEXP X_cs_rdmSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type u(uSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type b_mean(b_meanSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type sigma_re(sigma_reSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type OmegaRE(OmegaRESEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type prob(probSEXP);
+    Rcpp::traits::input_parameter< double >::type constant_term(constant_termSEXP);
+    Rcpp::traits::input_parameter< int >::type nRandEffect(nRandEffectSEXP);
+    Rcpp::traits::input_parameter< int >::type nFixedEffect(nFixedEffectSEXP);
+    Rcpp::traits::input_parameter< int >::type nChoiceSet(nChoiceSetSEXP);
+    Rcpp::traits::input_parameter< int >::type iRE(iRESEXP);
+    Rcpp::traits::input_parameter< int >::type choice_set_size(choice_set_sizeSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type X_cs_rdm(X_cs_rdmSEXP);
+    rcpp_result_gen = Rcpp::wrap(laplace_uj_fn_minimize(u, b_mean, sigma_re, OmegaRE, X, beta, prob, constant_term, nRandEffect, nFixedEffect, nChoiceSet, iRE, choice_set_size, X_cs_rdm));
+    return rcpp_result_gen;
+END_RCPP
+}
+// laplace_uj_evaluate_H
+Eigen::MatrixXd laplace_uj_evaluate_H(const Eigen::Map<Eigen::VectorXd>& u, const Eigen::Map<Eigen::VectorXd>& b_mean, const Eigen::Map<Eigen::MatrixXd>& OmegaRE, const Eigen::Map<Eigen::VectorXd>& sigma_re, const Eigen::Map<Eigen::MatrixXd>& X, const Eigen::Map<Eigen::MatrixXd>& XR, Eigen::Map<Eigen::VectorXd>& beta, Eigen::Map<Eigen::VectorXd>& prob, int nRandEffect, int nFixedEffect, int nChoiceSet, int iRE, int choice_set_size, const Eigen::Map<Eigen::MatrixXd>& X_cs_rdm, double constant_term);
+RcppExport SEXP _PanelMixedDesign_laplace_uj_evaluate_H(SEXP uSEXP, SEXP b_meanSEXP, SEXP OmegaRESEXP, SEXP sigma_reSEXP, SEXP XSEXP, SEXP XRSEXP, SEXP betaSEXP, SEXP probSEXP, SEXP nRandEffectSEXP, SEXP nFixedEffectSEXP, SEXP nChoiceSetSEXP, SEXP iRESEXP, SEXP choice_set_sizeSEXP, SEXP X_cs_rdmSEXP, SEXP constant_termSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type u(uSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type b_mean(b_meanSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type OmegaRE(OmegaRESEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type sigma_re(sigma_reSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type XR(XRSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type prob(probSEXP);
+    Rcpp::traits::input_parameter< int >::type nRandEffect(nRandEffectSEXP);
+    Rcpp::traits::input_parameter< int >::type nFixedEffect(nFixedEffectSEXP);
+    Rcpp::traits::input_parameter< int >::type nChoiceSet(nChoiceSetSEXP);
+    Rcpp::traits::input_parameter< int >::type iRE(iRESEXP);
+    Rcpp::traits::input_parameter< int >::type choice_set_size(choice_set_sizeSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type X_cs_rdm(X_cs_rdmSEXP);
+    Rcpp::traits::input_parameter< double >::type constant_term(constant_termSEXP);
+    rcpp_result_gen = Rcpp::wrap(laplace_uj_evaluate_H(u, b_mean, OmegaRE, sigma_re, X, XR, beta, prob, nRandEffect, nFixedEffect, nChoiceSet, iRE, choice_set_size, X_cs_rdm, constant_term));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -48,6 +199,79 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< Eigen::VectorXd >::type var_vec(var_vecSEXP);
     Rcpp::traits::input_parameter< int >::type nChoiceSet(nChoiceSetSEXP);
     rcpp_result_gen = Rcpp::wrap(PQLApprox(nu, X, b_mean, var_vec, nChoiceSet));
+    return rcpp_result_gen;
+END_RCPP
+}
+// normalizeProbabilities
+Eigen::VectorXd normalizeProbabilities(Eigen::VectorXd probs, int n_choice);
+RcppExport SEXP _PanelMixedDesign_normalizeProbabilities(SEXP probsSEXP, SEXP n_choiceSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type probs(probsSEXP);
+    Rcpp::traits::input_parameter< int >::type n_choice(n_choiceSEXP);
+    rcpp_result_gen = Rcpp::wrap(normalizeProbabilities(probs, n_choice));
+    return rcpp_result_gen;
+END_RCPP
+}
+// update_response_probabilities_inplace
+void update_response_probabilities_inplace(Eigen::Map<Eigen::VectorXd>& prob, const Eigen::Map<Eigen::MatrixXd>& X, const Eigen::Map<Eigen::VectorXd>& beta, int n_choice);
+RcppExport SEXP _PanelMixedDesign_update_response_probabilities_inplace(SEXP probSEXP, SEXP XSEXP, SEXP betaSEXP, SEXP n_choiceSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type prob(probSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< int >::type n_choice(n_choiceSEXP);
+    update_response_probabilities_inplace(prob, X, beta, n_choice);
+    return R_NilValue;
+END_RCPP
+}
+// update_delta_inplace
+void update_delta_inplace(Eigen::Map<Eigen::MatrixXd>& delta, const Eigen::Map<Eigen::VectorXd>& p, int n_choice_set);
+RcppExport SEXP _PanelMixedDesign_update_delta_inplace(SEXP deltaSEXP, SEXP pSEXP, SEXP n_choice_setSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::MatrixXd>& >::type delta(deltaSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type p(pSEXP);
+    Rcpp::traits::input_parameter< int >::type n_choice_set(n_choice_setSEXP);
+    update_delta_inplace(delta, p, n_choice_set);
+    return R_NilValue;
+END_RCPP
+}
+// impsamp_calc_info_given_Y
+Eigen::MatrixXd impsamp_calc_info_given_Y(Eigen::VectorXd Y, Eigen::MatrixXd X, Eigen::VectorXd b_mean, Eigen::VectorXd var_vec, int nChoiceSet, int nU, bool return_unweighted, Eigen::VectorXd& marginal_prob_store);
+RcppExport SEXP _PanelMixedDesign_impsamp_calc_info_given_Y(SEXP YSEXP, SEXP XSEXP, SEXP b_meanSEXP, SEXP var_vecSEXP, SEXP nChoiceSetSEXP, SEXP nUSEXP, SEXP return_unweightedSEXP, SEXP marginal_prob_storeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< Eigen::MatrixXd >::type X(XSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type b_mean(b_meanSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type var_vec(var_vecSEXP);
+    Rcpp::traits::input_parameter< int >::type nChoiceSet(nChoiceSetSEXP);
+    Rcpp::traits::input_parameter< int >::type nU(nUSEXP);
+    Rcpp::traits::input_parameter< bool >::type return_unweighted(return_unweightedSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd& >::type marginal_prob_store(marginal_prob_storeSEXP);
+    rcpp_result_gen = Rcpp::wrap(impsamp_calc_info_given_Y(Y, X, b_mean, var_vec, nChoiceSet, nU, return_unweighted, marginal_prob_store));
+    return rcpp_result_gen;
+END_RCPP
+}
+// R_impsamp_calc_info_given_Y
+Eigen::MatrixXd R_impsamp_calc_info_given_Y(Eigen::VectorXd Y, Eigen::MatrixXd X, Eigen::VectorXd b_mean, Eigen::VectorXd var_vec, int nChoiceSet, int nU, bool return_unweighted, Eigen::Map<Eigen::VectorXd>& marginal_prob_store);
+RcppExport SEXP _PanelMixedDesign_R_impsamp_calc_info_given_Y(SEXP YSEXP, SEXP XSEXP, SEXP b_meanSEXP, SEXP var_vecSEXP, SEXP nChoiceSetSEXP, SEXP nUSEXP, SEXP return_unweightedSEXP, SEXP marginal_prob_storeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< Eigen::MatrixXd >::type X(XSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type b_mean(b_meanSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type var_vec(var_vecSEXP);
+    Rcpp::traits::input_parameter< int >::type nChoiceSet(nChoiceSetSEXP);
+    Rcpp::traits::input_parameter< int >::type nU(nUSEXP);
+    Rcpp::traits::input_parameter< bool >::type return_unweighted(return_unweightedSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type marginal_prob_store(marginal_prob_storeSEXP);
+    rcpp_result_gen = Rcpp::wrap(R_impsamp_calc_info_given_Y(Y, X, b_mean, var_vec, nChoiceSet, nU, return_unweighted, marginal_prob_store));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -83,13 +307,59 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// impsamp_calc_conditional_prob_vector_inplace_R
+void impsamp_calc_conditional_prob_vector_inplace_R(Eigen::Map<Eigen::VectorXd>& condProbs, const Eigen::VectorXd& Y, const Eigen::MatrixXd& probs, int nChoiceSet);
+RcppExport SEXP _PanelMixedDesign_impsamp_calc_conditional_prob_vector_inplace_R(SEXP condProbsSEXP, SEXP YSEXP, SEXP probsSEXP, SEXP nChoiceSetSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::VectorXd>& >::type condProbs(condProbsSEXP);
+    Rcpp::traits::input_parameter< const Eigen::VectorXd& >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< const Eigen::MatrixXd& >::type probs(probsSEXP);
+    Rcpp::traits::input_parameter< int >::type nChoiceSet(nChoiceSetSEXP);
+    impsamp_calc_conditional_prob_vector_inplace_R(condProbs, Y, probs, nChoiceSet);
+    return R_NilValue;
+END_RCPP
+}
+// impsamp_update_easy_terms_inplace
+void impsamp_update_easy_terms_inplace(Eigen::Map<Eigen::MatrixXd>& Delta, Eigen::Map<Eigen::MatrixXd>& PPt, Eigen::Map<Eigen::MatrixXd>& PRatiosT, Eigen::Map<Eigen::MatrixXd>& responseProbs, Eigen::Map<Eigen::MatrixXd>& U22, const Eigen::MatrixXd& X, const Eigen::VectorXd& b_mean, const Eigen::VectorXd& var_vec, int nChoiceSet, int nU);
+RcppExport SEXP _PanelMixedDesign_impsamp_update_easy_terms_inplace(SEXP DeltaSEXP, SEXP PPtSEXP, SEXP PRatiosTSEXP, SEXP responseProbsSEXP, SEXP U22SEXP, SEXP XSEXP, SEXP b_meanSEXP, SEXP var_vecSEXP, SEXP nChoiceSetSEXP, SEXP nUSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::MatrixXd>& >::type Delta(DeltaSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::MatrixXd>& >::type PPt(PPtSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::MatrixXd>& >::type PRatiosT(PRatiosTSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::MatrixXd>& >::type responseProbs(responseProbsSEXP);
+    Rcpp::traits::input_parameter< Eigen::Map<Eigen::MatrixXd>& >::type U22(U22SEXP);
+    Rcpp::traits::input_parameter< const Eigen::MatrixXd& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const Eigen::VectorXd& >::type b_mean(b_meanSEXP);
+    Rcpp::traits::input_parameter< const Eigen::VectorXd& >::type var_vec(var_vecSEXP);
+    Rcpp::traits::input_parameter< int >::type nChoiceSet(nChoiceSetSEXP);
+    Rcpp::traits::input_parameter< int >::type nU(nUSEXP);
+    impsamp_update_easy_terms_inplace(Delta, PPt, PRatiosT, responseProbs, U22, X, b_mean, var_vec, nChoiceSet, nU);
+    return R_NilValue;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_PanelMixedDesign_laplaceApproximation", (DL_FUNC) &_PanelMixedDesign_laplaceApproximation, 5},
+    {"_PanelMixedDesign_laplace_set_maxprob_Y_inplace", (DL_FUNC) &_PanelMixedDesign_laplace_set_maxprob_Y_inplace, 3},
+    {"_PanelMixedDesign_laplace_u1_fn_minimize", (DL_FUNC) &_PanelMixedDesign_laplace_u1_fn_minimize, 9},
+    {"_PanelMixedDesign_laplace_u1_gr_minimize", (DL_FUNC) &_PanelMixedDesign_laplace_u1_gr_minimize, 9},
+    {"_PanelMixedDesign_laplace_usj_fn_minimize", (DL_FUNC) &_PanelMixedDesign_laplace_usj_fn_minimize, 13},
+    {"_PanelMixedDesign_laplace_usj_evaluate_H", (DL_FUNC) &_PanelMixedDesign_laplace_usj_evaluate_H, 14},
+    {"_PanelMixedDesign_laplace_uj_fn_minimize", (DL_FUNC) &_PanelMixedDesign_laplace_uj_fn_minimize, 14},
+    {"_PanelMixedDesign_laplace_uj_evaluate_H", (DL_FUNC) &_PanelMixedDesign_laplace_uj_evaluate_H, 15},
     {"_PanelMixedDesign_MSMApprox", (DL_FUNC) &_PanelMixedDesign_MSMApprox, 5},
     {"_PanelMixedDesign_PQLApprox", (DL_FUNC) &_PanelMixedDesign_PQLApprox, 5},
+    {"_PanelMixedDesign_normalizeProbabilities", (DL_FUNC) &_PanelMixedDesign_normalizeProbabilities, 2},
+    {"_PanelMixedDesign_update_response_probabilities_inplace", (DL_FUNC) &_PanelMixedDesign_update_response_probabilities_inplace, 4},
+    {"_PanelMixedDesign_update_delta_inplace", (DL_FUNC) &_PanelMixedDesign_update_delta_inplace, 3},
+    {"_PanelMixedDesign_impsamp_calc_info_given_Y", (DL_FUNC) &_PanelMixedDesign_impsamp_calc_info_given_Y, 8},
+    {"_PanelMixedDesign_R_impsamp_calc_info_given_Y", (DL_FUNC) &_PanelMixedDesign_R_impsamp_calc_info_given_Y, 8},
     {"_PanelMixedDesign_importanceSampleFixedY", (DL_FUNC) &_PanelMixedDesign_importanceSampleFixedY, 6},
     {"_PanelMixedDesign_importanceSample", (DL_FUNC) &_PanelMixedDesign_importanceSample, 6},
+    {"_PanelMixedDesign_impsamp_calc_conditional_prob_vector_inplace_R", (DL_FUNC) &_PanelMixedDesign_impsamp_calc_conditional_prob_vector_inplace_R, 4},
+    {"_PanelMixedDesign_impsamp_update_easy_terms_inplace", (DL_FUNC) &_PanelMixedDesign_impsamp_update_easy_terms_inplace, 10},
     {NULL, NULL, 0}
 };
 

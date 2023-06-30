@@ -14,14 +14,14 @@ cprob<-function(b,modmat, qes)                        # each column of b is a ve
 
 
 
-#' Marginal Quasi Likelihood approach to approximate the information matrix for the
+#' Marginal Quasi Likelihood approach to approximate the variance covariance matrix for the
 #' model parameters
 #' 
 #' @param modmat The model matrix
 #' @param effectMean Vector of means for the effects coded attribute effects
 #' @param effectVar Vector of variances for the effects coded attribute effects
 #' @param nChoiceSet Number of choice sets
-#' @return The approximation to the information matrix for the model parameters
+#' @return The approximation to the variance covariance matrix for the model parameters
 MQLApprox <- function(modmat,
                       effectMean,
                       effectVar,

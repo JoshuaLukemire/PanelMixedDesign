@@ -65,7 +65,6 @@ Eigen::VectorXd impsamp_SampleEpsilon(int totalAlternatives){
 
 
 // [[Rcpp::depends(RcppEigen)]]
-
 Eigen::VectorXd impsamp_calc_marginal_prob(Eigen::VectorXd Y, Eigen::MatrixXd probs,
                                            int nChoiceSet){
   // Find the number of samples
@@ -90,13 +89,15 @@ Eigen::VectorXd impsamp_calc_marginal_prob(Eigen::VectorXd Y, Eigen::MatrixXd pr
 }
 
 
-
+// [[Rcpp::export]]
 Eigen::MatrixXd impsamp_calc_info_given_Y(Eigen::VectorXd Y,
                                           Eigen::MatrixXd X,
                                           Eigen::VectorXd b_mean,
                                           Eigen::VectorXd var_vec,
                                           int nChoiceSet,
-                                          int nU){
+                                          int nU,
+                                          bool return_unweighted,
+                                          Eigen::VectorXd & marginal_prob_store){
   
   int nRandEffect = 0;
   for (int i = 0; i < var_vec.size(); i++){
@@ -138,11 +139,108 @@ Eigen::MatrixXd impsamp_calc_info_given_Y(Eigen::VectorXd Y,
     responseProbs.col(iu) = calculateResponseProbs(X, beta_i.col(iu), nChoiceSet);
   }
 
-  // Calculate the marginal probabilities
+  // Calculate the marginal probabilities, each column corresponds to a u_i
   Eigen::VectorXd margProbs = impsamp_calc_marginal_prob(Y, responseProbs, nChoiceSet);
   
   // Average of the probabilities from above over nU is the marginal prob
-  double marg_prob = margProbs.sum() / nU;
+  double marg_prob = margProbs.sum() / nU; // P(Y = y)
+  
+  Eigen::VectorXd f1 = (responseProbs.matrix() * margProbs.matrix()).array() * (1.0 / nU) * (1.0 / marg_prob);
+  
+  // score function for the regression coefficients
+  Eigen::VectorXd score11 = X.matrix().transpose() * (Y.array() - f1.array()).matrix();
+  
+  // Upper P x P block of the information matrix
+  Eigen::MatrixXd I11 = (score11 * score11.transpose()).array() * marg_prob;  
+  
+  // U22 (for the lower 2 x 2 block)
+  Eigen::MatrixXd U22 = Eigen::MatrixXd::Zero(nRandEffect, nU);
+  for (int iU = 0; iU < nU; iU++){
+    for (int iP = 0; iP < nRandEffect; iP++){
+      U22(iP, iU) = pow(sd_vec(iP) * u(iP, iU), 2) / pow(sqrt(var_vec(iP)), 3);
+    }
+  }
+  
+  Eigen::VectorXd f2 = (U22.matrix() * margProbs.matrix()).array() * (1.0 / nU) * (1.0 / marg_prob);
+  //Eigen::VectorXd f2 = (U22.matrix() * margProbs.matrix()).array() * (1.0 / nU);
+  Eigen::VectorXd score2 = sd_vec.array().inverse() * (-1.0) + f2.array();
+  
+  Eigen::MatrixXd I12 = (score11.matrix() * score2.matrix().transpose()).array() * marg_prob;
+  Eigen::MatrixXd I22 = (score2.matrix()  * score2.matrix().transpose()).array() * marg_prob;
+  
+  Eigen::MatrixXd fisherInfo = Eigen::MatrixXd::Zero( effect_dim + nRandEffect,
+                                                      effect_dim + nRandEffect );
+  
+  fisherInfo.block(0, 0, effect_dim, effect_dim) = I11;
+  fisherInfo.block(0, effect_dim, effect_dim, nRandEffect) = I12;
+  fisherInfo.block(effect_dim, 0, nRandEffect, effect_dim) = I12.transpose();
+  fisherInfo.block(effect_dim, effect_dim, nRandEffect, nRandEffect) = I22.block(0, 0, nRandEffect, nRandEffect);
+  
+  marginal_prob_store(0) = marg_prob;
+  if (return_unweighted == true){
+    fisherInfo = fisherInfo / marg_prob;
+  }
+  
+  return fisherInfo;
+}
+
+
+
+// [[Rcpp::export]]
+Eigen::MatrixXd R_impsamp_calc_info_given_Y(Eigen::VectorXd Y,
+                                          Eigen::MatrixXd X,
+                                          Eigen::VectorXd b_mean,
+                                          Eigen::VectorXd var_vec,
+                                          int nChoiceSet,
+                                          int nU,
+                                          bool return_unweighted,
+                                          Eigen::Map<Eigen::VectorXd> & marginal_prob_store){
+  
+  int nRandEffect = 0;
+  for (int i = 0; i < var_vec.size(); i++){
+    if (var_vec(i) > 0){
+      nRandEffect++;
+    }
+  }
+  int nFixedEffect = var_vec.size() - nRandEffect;
+  
+  // Number of beta terms
+  int effect_dim = b_mean.size();
+  
+  // Draw random effect samples and calculate corresponding effects (beta)
+  // each row is an effect and each column is a sample
+  std::random_device rd; 
+  std::mt19937 gen(rd()); 
+  
+  //std::default_random_engine generator(); // todo random gen
+  std::normal_distribution<double> distribution(0.0, 1.0);
+  Eigen::MatrixXd u = Eigen::MatrixXd::Zero(nRandEffect, nU);
+  Eigen::MatrixXd beta_i = Eigen::MatrixXd::Zero(effect_dim, nU);
+  Eigen::VectorXd sd_vec = Eigen::VectorXd::Zero(nRandEffect);
+  for (int ip = 0; ip < nRandEffect; ip++){
+    sd_vec(ip) = sqrt(var_vec(ip));
+    for (int iu = 0; iu < nU; iu++){
+      u(ip, iu) = distribution(gen);
+    }
+  }
+  Eigen::MatrixXd sd_mat = sd_vec.asDiagonal();
+  
+  for (int iu = 0; iu < nU; iu++){
+    beta_i.block(0,           iu,  nRandEffect, 1) = b_mean.segment(0,           nRandEffect) + sd_mat *  u.col(iu);
+    beta_i.block(nRandEffect, iu, nFixedEffect, 1) = b_mean.segment(nRandEffect, nFixedEffect);
+  }
+  
+  // Calculate the response probabilities
+  Eigen::MatrixXd responseProbs = Eigen::MatrixXd::Zero(Y.size(), nU);
+  for (int iu = 0; iu < nU; iu++){
+    responseProbs.col(iu) = calculateResponseProbs(X, beta_i.col(iu), nChoiceSet);
+  }
+  
+  // Calculate the marginal probabilities, each column corresponds to a u_i
+  Eigen::VectorXd margProbs = impsamp_calc_marginal_prob(Y, responseProbs, nChoiceSet);
+  
+  // Average of the probabilities from above over nU is the marginal prob
+  double marg_prob = margProbs.sum() / nU; // P(Y = y)
   
   Eigen::VectorXd f1 = (responseProbs.matrix() * margProbs.matrix()).array() * (1.0 / nU) * (1.0 / marg_prob);
   
@@ -173,6 +271,11 @@ Eigen::MatrixXd impsamp_calc_info_given_Y(Eigen::VectorXd Y,
   fisherInfo.block(0, effect_dim, effect_dim, nRandEffect) = I12;
   fisherInfo.block(effect_dim, 0, nRandEffect, effect_dim) = I12.transpose();
   fisherInfo.block(effect_dim, effect_dim, nRandEffect, nRandEffect) = I22.block(0, 0, nRandEffect, nRandEffect);
+  
+  marginal_prob_store(0) = marg_prob;
+  if (return_unweighted == true){
+    fisherInfo = fisherInfo / marg_prob;
+  }
   
   return fisherInfo;
 }
@@ -207,11 +310,12 @@ Eigen::MatrixXd importanceSampleFixedY(Eigen::MatrixXd Y,
   }
   
   Eigen::MatrixXd FI = Eigen::MatrixXd::Zero(b_mean.size() + nRandEffect, b_mean.size() + nRandEffect);
+  Eigen::VectorXd marginal_prob_store = Eigen::VectorXd::Zero(1);
   
   int nY = Y.cols();
   
   for (int iY = 0; iY < nY; iY++){
-    FI += impsamp_calc_info_given_Y(Y.col(iY), X, b_mean, var_vec, nChoiceSet, nU);
+    FI += impsamp_calc_info_given_Y(Y.col(iY), X, b_mean, var_vec, nChoiceSet, nU, false, marginal_prob_store);
   }
   
   return FI;
@@ -240,15 +344,28 @@ Eigen::MatrixXd importanceSample(     Eigen::MatrixXd X,
   Eigen::VectorXd expXB = Eigen::VectorXd::Zero(X.rows());
   
   Eigen::VectorXd XB    = Eigen::VectorXd::Ones(X.rows());
+  Eigen::VectorXd Py    = Eigen::VectorXd::Zero(X.rows());
   
+  Eigen::VectorXd marginal_prob_store = Eigen::VectorXd::Zero(1);
   
+  double total_probability = 0.0;
+
   for (int iY = 0; iY < nY; iY++){
     epsilon.col(0) = impsamp_SampleEpsilon(X.rows());
+    //XB    = X * (b_mean + epsilon.col(0));
     XB    = X * b_mean + epsilon.col(0);
     expXB = XB.array().exp();
+    
     Y  = impsamp_SampleY(expXB, X, nChoiceSet);
-    FI += impsamp_calc_info_given_Y(Y.col(0), X, b_mean, var_vec, nChoiceSet, nU);
+    Py = normalizeProbabilities(expXB, nChoiceSet);
+    //FI += impsamp_calc_info_given_Y(Y.col(0), X, b_mean, var_vec, nChoiceSet, nU, false, marginal_prob_store) /
+    //  Py.array().pow(Y.col(0).array()).prod() / nY;
+    FI += impsamp_calc_info_given_Y(Y.col(0), X, b_mean, var_vec, nChoiceSet, nU, false, marginal_prob_store);
+    
+    total_probability += marginal_prob_store(0);
   }
+  
+  FI = FI / total_probability;
   
   return FI;
   
