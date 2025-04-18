@@ -20,5 +20,7 @@ exchange algorithm.
 You can install the development version of `PanelMixedDesign` from
 GitHub with:
 
-\`\`\`r \# install.packages(“devtools”)
-devtools::install_github(“JoshuaLukemire/PanelMixedDesign”)
+``` r
+# install.packages("devtools")
+devtools::install_github("JoshuaLukemire/PanelMixedDesign")
+```
