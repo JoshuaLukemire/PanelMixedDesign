@@ -10,3 +10,4 @@
 ^.*\.pdf$
 ^vignettes/.*\.Rmd$
 ^vignettes/.*\.html$
+^\.github$

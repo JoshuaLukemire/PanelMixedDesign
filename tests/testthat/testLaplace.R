@@ -12,7 +12,7 @@ test_that("Laplace Runs for random effects only", {
   st = NULL
   fullfac <- purrr::quietly(fac.design)(nlevels=nLevelAttribute, random=FALSE)$result
   for(i in 1:n_choice_set){
-    st = c( st, sample(prod(nLevelAttribute), nAlternative, replace=TRUE) )
+    st = c( st, sample(prod(nLevelAttribute), nAlternative, replace=FALSE) )
   }
   designm=(fullfac)[st,]
   contr=rep('contr.sum',nattr)
@@ -35,7 +35,7 @@ test_that("Laplace Runs for random effects + fixed effects", {
   st = NULL
   fullfac <- purrr::quietly(fac.design)(nlevels=nLevelAttribute, random=FALSE)$result
   for(i in 1:n_choice_set){
-    st = c( st, sample(prod(nLevelAttribute), nAlternative, replace=TRUE) )
+    st = c( st, sample(prod(nLevelAttribute), nAlternative, replace=FALSE) )
   }
   designm=(fullfac)[st,]
   contr=rep('contr.sum',nattr)
