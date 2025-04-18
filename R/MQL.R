@@ -1,68 +1,117 @@
-#' Calculate choice probabilities
+#' Calculate choice probabilities for each alternative in each choice set
 #' 
 #' @param b Vector of effects
-#' @param modmat The model matrix
-#' @param qes A vector of alternative ids (eg 1, 2, 3, 1, 2, 3, 1, 2, 3)
+#' @param model_matrix The model matrix. Dimension should be 
+#' @param alternative_ordering A vector of alternative ids (eg 1, 2, 3, 1, 2, 3, 1, 2, 3)
 #' @return The probability of each alternative being selected in each choice set
-cprob<-function(b,modmat, qes)                        # each column of b is a vector of parameter values(nrow = dimb), modmat is the coded design matrix (sum(cs)*dimb)
-{
-  rep=exp(modmat%*%b)                                # each column of rep is a vector of representative utilities of alternatives, nrow = sum(cs)
-  sumrep=apply(rep,2,function(x) stats::ave(x,qes,FUN=sum)) # each column of sumrep is a vector of sum of utilities in each choice set, nrow = ns
-  p=rep/sumrep                                       # each column of p is a vector of choice probabilities of alternatives, nrow = ns
+#' @keywords internal
+evaluate_choice_probabilities <- function(b, model_matrix, alternative_ordering){
+  rep=exp(model_matrix %*% b)                               
+  sumrep=apply(rep,2,function(x) stats::ave(x, alternative_ordering, FUN=sum)) 
+  p=rep/sumrep                              
   return(p)                                          
 }
 
-
-
-#' Marginal Quasi Likelihood approach to approximate the variance covariance matrix for the
+#' Marginal Quasi-Likelihood approach to approximate the variance covariance matrix for the
 #' model parameters
 #' 
-#' @param modmat The model matrix
-#' @param effectMean Vector of means for the effects coded attribute effects
-#' @param effectVar Vector of variances for the effects coded attribute effects
-#' @param nChoiceSet Number of choice sets
+#' @param model_matrix The model matrix (effects coded), should be (n_alternative * n_choice_set) x n_beta
+#' @param effect_mean Vector of means for the effects coded attribute effects
+#' @param effect_var Vector of variances for the effects coded attribute effects
+#' @param n_choice_set Number of choice sets
 #' @return The approximation to the variance covariance matrix for the model parameters
-MQLApprox <- function(modmat,
-                      effectMean,
-                      effectVar,
-                      nChoiceSet){  
+#' @keywords internal
+MQL_approx_vcov <- function(model_matrix,
+                      effect_mean,
+                      effect_var,
+                      n_choice_set){  
   
-  dimb <- length(effectMean)
-  dimbr <- sum(effectVar > 0)
-  sigmar <- effectVar[1:dimbr]
+  # Total number of effects
+  dimb   <- length(effect_mean)
   
-  n_alternative <- nrow(modmat) / nChoiceSet
+  # Number of random effects
+  dimbr  <- sum(effect_var > 0)
   
-  modmatd = matrix(0, nChoiceSet*(n_alternative-1), dimb)
-  S = nChoiceSet
-  J = n_alternative
-  delta = matrix(0,S*J,S*J)
-  cs=rep(n_alternative, nChoiceSet)           
-  ns=length(cs) 
-  ind2 = seq(J,by=J,length=S)
-  qes<- rep(factor(1:ns),times=cs) # a vector of ids of the alternatives in each choice set. 
-  for(i in 1:nChoiceSet){
-    
-    modmatd[((i-1)*(J-1)+1):(i*(J-1)),] = modmat[((i-1)*J+1):((i-1)*J+J-1),]-modmat[i*J,]
-    
+  # Corresponding variances
+  sigmar <- effect_var[1:dimbr]
+  
+  # Number of alternatives per choice set
+  n_alternative <- nrow(model_matrix) / n_choice_set
+  
+  # vector containing number of alternatives per choice set, only needed
+  # to simplify some sequence/vector commands later
+  alternative_counts = rep(n_alternative, n_choice_set)   
+  
+  # index set used when later doing setdiff
+  setdiff_indices = seq(n_alternative, by=n_alternative, length=n_choice_set)
+  
+  # a vector of ids of the alternatives in each choice set, e.g. 1, 2, 3, 1, 2, 3,...
+  alternative_ordering <- rep(factor(1:n_choice_set), times=alternative_counts)
+  
+  # "differenced" version of the model matrix
+  # This is obtained by taking each alternative EXCEPT the last and subtracting
+  # the settings for the last alternative within each choice set
+  model_matrix_differenced = matrix(0, n_choice_set*(n_alternative-1), dimb)
+  
+  # Difference within each choice set
+  for(i in 1:n_choice_set){
+    # Final alternative of this choice set
+    reference_row <- matrix(model_matrix[i*n_alternative,], nrow = 1)
+    # Subtract final alternative from all other alternatives in this choice set
+    if (n_alternative == 2){
+      model_matrix_differenced[((i-1)*(n_alternative-1)+1):(i*(n_alternative-1)),] = 
+        model_matrix[((i-1)*n_alternative+1):((i-1)*n_alternative+n_alternative-1),] - reference_row
+    } else {
+      model_matrix_differenced[((i-1)*(n_alternative-1)+1):(i*(n_alternative-1)),] = 
+        sweep(model_matrix[((i-1)*n_alternative+1):((i-1)*n_alternative+n_alternative-1),],
+              2, reference_row)
+    }
   }
+  
+  # Inverse of the variance-covariance matrix
   I = matrix(0,dimb+dimbr,dimb+dimbr)
-  I11 = 0
-  I22 = 0
-  u = 0
-  p = cprob(effectMean,modmat, qes) # p evaluated at tilde(u)
-  for( j in 1:nChoiceSet){
-    st = (j-1)*n_alternative+1
-    en = j*n_alternative
-    pos = st:en
-    delta[pos,pos]=diag(p[pos,1])-p[pos,1]%*%t(p[pos,1])
+  
+  # This is Delta_n = diag(p) - pp'
+  delta = matrix(0, nrow = n_choice_set*n_alternative, ncol = n_choice_set*n_alternative)
+  # p evaluated at tilde(u), which is 0 for MQL
+  p = evaluate_choice_probabilities(effect_mean, model_matrix, alternative_ordering)
+  for (j in 1:n_choice_set){
+    # Indices for this choice set
+    cs_indices = ((j-1)*n_alternative+1):(j*n_alternative)
+    delta[cs_indices,cs_indices] <- diag(p[cs_indices,1]) - p[cs_indices,1] %*% t(p[cs_indices,1])
   }
-  v = solve(delta[setdiff(1:(nChoiceSet*n_alternative),ind2),setdiff(1:(nChoiceSet*n_alternative),ind2)])+modmatd%*%diag(effectVar)%*%t(modmatd)  # vn in the formula
-  vi = solve(v)
-  vix = vi%*%modmatd
-  I11 = I11 + t(modmatd)%*%vix
-  I22 = 	I22 + 2*diag(sqrt(effectVar))%*%(t(modmatd)%*%vi%*%modmatd)^2%*%diag(sqrt(effectVar))
-  I[1:dimb,1:dimb] = I11
-  I[(dimb+1):(dimb+dimbr),(dimb+1):(dimb+dimbr)] = I22[1:dimbr,1:dimbr]
-  return(I)
+  
+  # V = Delta^{-1} | u=0 + X Sigma X'
+  delta_inverse <- solve(delta[setdiff(1:(n_choice_set*n_alternative), setdiff_indices),
+                               setdiff(1:(n_choice_set*n_alternative), setdiff_indices)])
+  Vn            <- delta_inverse + model_matrix_differenced %*% diag(effect_var) %*% t(model_matrix_differenced)
+  Vn_inverse    <- solve(Vn)
+  Vn_inverse_X  <- Vn_inverse %*% model_matrix_differenced
+  
+  # Upper left block of information matrix
+  I11 <- t(model_matrix_differenced) %*% Vn_inverse_X 
+  
+  # Lower right block of information matrix
+  I22 <- 0.5 * diag(sqrt(effect_var)) %*% I11^2 %*% diag(sqrt(effect_var))
+
+  # # Variance Covariance Matrix via inversion of information matrix
+  # vcov_mql                        <- matrix(0,dimb+dimbr,dimb+dimbr)
+  # vcov_mql[1:dimb,1:dimb]         <- solve(I11)
+  # vcov_mql[(dimb+1):(dimb+dimbr),
+  #          (dimb+1):(dimb+dimbr)] <- solve(I22[1:dimbr,1:dimbr])
+  
+  vcov_mql <- tryCatch(
+    expr = {
+      vcov_mql                        <- matrix(0,dimb+dimbr,dimb+dimbr)
+      vcov_mql[1:dimb,1:dimb]         <- solve(I11)
+      vcov_mql[(dimb+1):(dimb+dimbr),
+               (dimb+1):(dimb+dimbr)] <- solve(I22[1:dimbr,1:dimbr])
+      vcov_mql
+    },
+    error = function(e){
+      vcov_mql = matrix(NA, nrow = dimb + dimbr, ncol = dimb + dimbr)
+    }
+  )
+  
+  return(vcov_mql)
 }

@@ -8,16 +8,16 @@ Eigen::MatrixXd sampleRandomBeta(int n_u,
                                  Eigen::VectorXd b_mean,
                                  Eigen::VectorXd var_vec);
 
-Eigen::VectorXd calculateResponseProbs(Eigen::MatrixXd X,
+Eigen::VectorXd calculate_response_probabilities(Eigen::MatrixXd X,
                                        Eigen::VectorXd beta,
                                        int n_choice);
 
-Eigen::VectorXd normalizeProbabilities(Eigen::VectorXd probs,
+Eigen::VectorXd normalize_probabilities(Eigen::VectorXd probs,
                                        int n_choice);
 
-Eigen::VectorXd sampleEpsilon(int totalAlternatives);
+Eigen::VectorXd sample_epsilon(int n_alternative_total);
 
-Eigen::MatrixXd calcDelta(Eigen::VectorXd p, int n_choice_set);
+Eigen::MatrixXd calculate_delta(Eigen::VectorXd p, int n_choice_set);
 
 
 #endif // __PMLH__

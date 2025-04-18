@@ -1,0 +1,94 @@
+---
+title: "PanelMixedLogit Demonstration"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Coordinate Exchange Example}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(PanelMixedDesign)
+library(DoE.base)
+library(tidyverse)
+library(ggplot2)
+library(gt)
+
+set.seed(458)
+```
+
+This vignette illustrates how to use the ```PanelMixedLogit``` library to evaluate the variance-covariance matrix for a design. For illustrative purposes, we will assume that we have a DCE with 3 attributes (two at 2-levels and one at 3-levels). We start by telling R how many attributes we have and how many levels each has:
+
+```{r}
+# 3 Attributes
+nattr <- 3
+
+# First two attributes at 2 levels, last attribute at 3 levels
+n_level_attribute <- c(2, 2, 3)
+```
+
+For the purpose of this illustration, we will assume that we want a discrete choice experiment with 8 choice sets, each presenting two alternatives:
+
+```{r}
+# Number of choice sets
+n_choice_set <- 8
+
+# Number of alternatives in each choice set
+n_alternative <- 2 
+```
+
+We start by generating a random design for this experiment using the ```DoE.base``` library:
+
+```{r}
+# Get a list of all possible alternatives
+all_possible_alt <- purrr::quietly(fac.design)(nlevels=n_level_attribute, random=FALSE)$result
+
+# Randomly select a subset of them for each choice set
+design <- NULL
+for (i_choice_set in 1:n_choice_set){
+  # Random sampling of alternatives for this choice set
+  new_choice_set <- all_possible_alt[sample(prod(n_level_attribute), n_alternative, replace=FALSE), ]
+  # Add to the running list of choice sets
+  design <- rbind(design, new_choice_set)
+}
+```
+
+Next, we get the corresponding effects coded model matrix:
+
+```{r}
+contr=rep('contr.sum',nattr)
+names(contr)=names(design)
+contr=as.list(contr)
+model_matrix = model.matrix(~., design, contrasts = contr)[,-1] 
+```
+
+Before we can assess the quality of this design, we need to define the effect means and variances. The following are used for illustration:
+
+```{r}
+# means
+mu <- c(1.0, -0.4, -0.8, 0.3)
+
+# variance
+sig <- c(0.1, 0.3, 0.4, 0.4)
+```
+
+Now we can find the corresponding approximation to the variance-covariance matrix. Here we will use the MQL approach since it is the fastest:
+
+
+```{r}
+varcov_MQL <- varcov_approx_PML(model_matrix, 
+                            method = "MQL",
+                            n_choice_set = n_choice_set,
+                            effect_means = mu, effect_vars = sig) 
+
+varcov_MQL
+```
+
+

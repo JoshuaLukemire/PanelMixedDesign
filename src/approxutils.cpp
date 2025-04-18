@@ -31,10 +31,8 @@ Eigen::MatrixXd sampleRandomBeta(int n_u,
   return beta_i;
 }
 
-//
-// calculateResponseProbabilitiesRaw
-//
-Eigen::VectorXd calculateResponseProbs(Eigen::MatrixXd X,
+
+Eigen::VectorXd calculate_response_probabilities(Eigen::MatrixXd X,
                                        Eigen::VectorXd beta,
                                        int n_choice){
   
@@ -69,7 +67,7 @@ Eigen::VectorXd calculateResponseProbs(Eigen::MatrixXd X,
 }
 
 // [[Rcpp::export]]
-Eigen::VectorXd normalizeProbabilities(Eigen::VectorXd probs,
+Eigen::VectorXd normalize_probabilities(Eigen::VectorXd probs,
                                        int n_choice){
   int n_alt_total = probs.rows();
   int choice_set_size = n_alt_total / n_choice;
@@ -89,50 +87,11 @@ Eigen::VectorXd normalizeProbabilities(Eigen::VectorXd probs,
   return(norm_probs);
 }
 
-
-//
-// calculateResponseProbabilitiesRaw
-//
-// [[Rcpp::export]]
-void update_response_probabilities_inplace(Eigen::Map<Eigen::VectorXd> & prob,
-                                           const Eigen::Map<Eigen::MatrixXd> & X,
-                                           const Eigen::Map<Eigen::VectorXd> & beta,
-                                           int n_choice){
-  
-  // Calculate the linear predictor
-  Eigen::VectorXd XB = X * beta;
-  Eigen::VectorXd expXB = XB.array().exp();
-  
-  // Total number of alternatives participant sees
-  int n_alt_total = XB.rows();
-  int choice_set_size = n_alt_total / n_choice;
-  
-  double prob_sum = 0.0;
-  for (int ichoice = 0; ichoice < n_choice; ichoice++){
-    
-    // Calculate the total sum of choice probabilities for this set
-    prob_sum = 0.0;
-    for (int ialt = 0; ialt < choice_set_size; ialt++){
-      prob_sum += expXB( ichoice*choice_set_size + ialt );
-    }
-    
-    // Now normalize
-    for (int ialt = 0; ialt < choice_set_size; ialt++){
-      prob(ichoice*choice_set_size + ialt) = expXB( ichoice*choice_set_size + ialt ) / prob_sum;
-    }
-    
-  }
-  
-}
-
-
-
-Eigen::VectorXd sampleEpsilon(int totalAlternatives){
-  Eigen::VectorXd eps = Eigen::VectorXd::Zero(totalAlternatives);
-  //std::cout << "adjusting epsilon" << std::endl;
-  //eps = (eps.array() + 1.0) / 2.0; 
+// uses GetRNGstate and PutRNGstate since not exported
+Eigen::VectorXd sample_epsilon(int n_alternative_total){
+  Eigen::VectorXd eps = Eigen::VectorXd::Zero(n_alternative_total);
   GetRNGstate();
-  for (int ii = 0; ii < totalAlternatives; ii++){
+  for (int ii = 0; ii < n_alternative_total; ii++){
     eps(ii) = R::runif(0.0, 1.0);
   }
   PutRNGstate();
@@ -144,7 +103,7 @@ Eigen::VectorXd sampleEpsilon(int totalAlternatives){
 //
 // Function to calculate Delta = diag(p) - pp'
 //
-Eigen::MatrixXd calcDelta(Eigen::VectorXd p,
+Eigen::MatrixXd calculate_delta(Eigen::VectorXd p,
                           int n_choice_set){
   
   int n_alt_total = p.size();
@@ -159,11 +118,6 @@ Eigen::MatrixXd calcDelta(Eigen::VectorXd p,
       delta(ichoice*choice_set_size + ialt, ichoice*choice_set_size + ialt) = p(ichoice*choice_set_size + ialt);
     }
     
-    // Subtract off pp'
-    //delta(Eigen::seq(ichoice*choice_set_size, ichoice*choice_set_size+choice_set_size-1),xxx
-    //      Eigen::seq(ichoice*choice_set_size, ichoice*choice_set_size+choice_set_size-1)) -= xxx
-    //        p(Eigen::seq(ichoice*choice_set_size, ichoice*choice_set_size+choice_set_size-1)) *xxx
-    //        p(Eigen::seq(ichoice*choice_set_size, ichoice*choice_set_size+choice_set_size-1));xxx
     
     delta.block(ichoice*choice_set_size, ichoice*choice_set_size, choice_set_size, choice_set_size) -=
       (p.segment(ichoice*choice_set_size, choice_set_size) *
@@ -177,33 +131,3 @@ Eigen::MatrixXd calcDelta(Eigen::VectorXd p,
 
 
 
-
-//
-// Function to calculate Delta = diag(p) - pp'
-//
-// [[Rcpp::export]]
-void update_delta_inplace(Eigen::Map<Eigen::MatrixXd> & delta,
-                          const Eigen::Map<Eigen::VectorXd> & p,
-                          int n_choice_set){
-  
-  int n_alt_total = p.size();
-  int choice_set_size = n_alt_total / n_choice_set;
-  
-  //Eigen::MatrixXd delta = Eigen::MatrixXd::Zero(n_alt_total, n_alt_total);
-  
-  delta *= 0.0;
-  
-  for (int ichoice = 0; ichoice < n_choice_set; ichoice++){
-    
-    // Diagonal portion of delta
-    for (int ialt = 0; ialt < choice_set_size; ialt++){
-      delta(ichoice*choice_set_size + ialt, ichoice*choice_set_size + ialt) = p(ichoice*choice_set_size + ialt);
-    }
-    
-    delta.block(ichoice*choice_set_size, ichoice*choice_set_size, choice_set_size, choice_set_size) -=
-      (p.segment(ichoice*choice_set_size, choice_set_size) *
-      p.segment(ichoice*choice_set_size, choice_set_size).transpose());
-    
-  } // /loop over choice sets
-  
-}

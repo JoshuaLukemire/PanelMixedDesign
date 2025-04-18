@@ -1,2 +1,12 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^\.DS_Store$
+^\.Rhistory$
+^\.RData$
+^.*\.log$
+^.*\.aux$
+^.*\.toc$
+^.*\.out$
+^.*\.pdf$
+^vignettes/.*\.Rmd$
+^vignettes/.*\.html$

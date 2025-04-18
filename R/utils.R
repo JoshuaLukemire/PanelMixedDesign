@@ -3,6 +3,7 @@
 #' @param nChoiceSet Number of choice sets
 #' @param nAlternative Number of alternatives per choice set
 #' @return An array with all possible response sequences to the experiment
+#' @export
 gen_all_choice_seq <- function(nChoiceSet, nAlternative){
   
   choice_sets <- rep(nAlternative, nChoiceSet)     
