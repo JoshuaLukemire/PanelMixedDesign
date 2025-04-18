@@ -77,7 +77,7 @@ fullfac <- purrr::quietly(fac.design)(nlevels=n_level_attribute, random=FALSE)$r
 
 # Generate a random design
 for(i in 1:n_choice_set){
-    st = c( st, sample(prod(n_level_attribute), n_alternative, replace=TRUE) )
+    st = c( st, sample(prod(n_level_attribute), n_alternative, replace=FALSE) )
 }
 designm=(fullfac)[st,]
 
