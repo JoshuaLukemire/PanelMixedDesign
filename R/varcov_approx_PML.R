@@ -1,6 +1,6 @@
 #' Approximate the variance covariance matrix for the model parameters
 #' 
-#' @param X The model matrix for the choice experiment. Each row is an effects coded alternative.
+#' @param X The model matrix for the choice experiment. Each row is an effects coded alternative. See example below for moving from the original design (in terms of attribute settings) to the corresponding effects coded model matrix.
 #' @param method Choice of variance-covariance approximation method. Options are MQL, PQL, MSM, Laplace, or Importance. MQL is the default.
 #' @param n_choice_set Number of choice sets
 #' @param effect_means Vector of means for the effects coded attribute effects
@@ -37,22 +37,30 @@
 #' # indices for alternatives
 #' st = NULL
 #' 
-#' # all possible design points
-#' fullfac <- purrr::quietly(fac.design)(nlevels=n_level_attribute, random=FALSE)$result
+#' # For this example, we do not already have a design, so we are going to
+#' # construct a random design by first enumerating all possible alternatives
+#' # and then randomly selecting a set of them for the experiment. 
+#' # When inputting this quantity yourself, this should be a matrix of dimension
+#' # (n_alternative * n_choice_set) x (n_attribute), where element i,j is the 
+#' # integer-valued attribute setting for row i, attribute j. 
 #' 
-#' # Generate a random design
+#' # Full enumeration of possible alternatives
+#' all_possible_points <- purrr::quietly(fac.design)(nlevels=n_level_attribute, random=FALSE)$result
+#' 
+#' # Randomly select n_choice_set * n_alternative rows (this is the DCE)
 #' for(i in 1:n_choice_set){
 #'     st = c( st, sample(prod(n_level_attribute), n_alternative, replace=FALSE) )
 #' }
-#' designm=(fullfac)[st,]
+#' design_matrix = (all_possible_points)[st,]
+#' rownames(design_matrix) <- NULL # remove unneeded row labels
 #' 
-#' # Effects coding
+#' # Effects coding of the design matrix
 #' contr=rep('contr.sum',nattr)
-#' names(contr)=names(designm)
+#' names(contr)=names(design_matrix)
 #' contr=as.list(contr)
-#' M = model.matrix(~., designm, contrasts = contr)[,-1] 
+#' model_matrix = model.matrix(~., design_matrix, contrasts = contr)[,-1] 
 #' 
-#' varcovAppr <- varcov_approx_PML(M, method = "PQL",
+#' varcovAppr <- varcov_approx_PML(model_matrix, method = "PQL",
 #'     n_choice_set = n_choice_set, effect_means = mu, effect_vars = sig) 
 #' 
 #' @export

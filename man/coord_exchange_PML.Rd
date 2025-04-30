@@ -60,3 +60,26 @@ List object containing the following results of the coordinate exchange algorith
 \description{
 Search for an optimal design under the panel mixed logit model
 }
+\examples{
+
+# 3 attributes
+nattr <- 3
+
+# First two attributes have two levels, third attribute has 3 levels
+n_level_attribute <- c(2, 2, 3)
+
+# 2 alternatives per choice set
+n_alternative <- 2 
+
+# Total of 8 choice sets
+n_choice_set <- 8
+
+# effect means
+mu <- c(1.0, -0.4, -0.8, 0.3)
+
+# effect variances
+sig <- c(0.1, 0.3, 0.4, 0.4)
+
+result <- coord_exchange_PML(n_choice_set, n_alternative, n_level_attribute, mu, sig, n_run = 10)
+
+}
