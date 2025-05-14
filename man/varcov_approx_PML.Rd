@@ -2,7 +2,7 @@
 % Please edit documentation in R/varcov_approx_PML.R
 \name{varcov_approx_PML}
 \alias{varcov_approx_PML}
-\title{Approximate the variance covariance matrix for the model parameters}
+\title{For a given choice experiment model matrix, this function will approximate the variance-covariance matrix for the model parameters under MQL, PQL, MSM, Laplace, or Importance Sampling}
 \usage{
 varcov_approx_PML(
   X,
@@ -45,7 +45,7 @@ varcov_approx_PML(
 The approximation to the variance covariance matrix for the model parameters.
 }
 \description{
-Approximate the variance covariance matrix for the model parameters
+For a given choice experiment model matrix, this function will approximate the variance-covariance matrix for the model parameters under MQL, PQL, MSM, Laplace, or Importance Sampling
 }
 \examples{
 # Libraries

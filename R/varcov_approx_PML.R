@@ -1,4 +1,4 @@
-#' Approximate the variance covariance matrix for the model parameters
+#' For a given choice experiment model matrix, this function will approximate the variance-covariance matrix for the model parameters under MQL, PQL, MSM, Laplace, or Importance Sampling
 #' 
 #' @param X The model matrix for the choice experiment. Each row is an effects coded alternative. See example below for moving from the original design (in terms of attribute settings) to the corresponding effects coded model matrix.
 #' @param method Choice of variance-covariance approximation method. Options are MQL, PQL, MSM, Laplace, or Importance. MQL is the default.

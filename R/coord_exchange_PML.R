@@ -1,4 +1,4 @@
-#' Search for an optimal design under the panel mixed logit model
+#' Search for an optimal choice experiment design under the panel mixed logit model
 #' 
 #' @param n_choice_set Number of choice sets
 #' @param n_alternative The number of alternatives in each choice set

@@ -2,7 +2,7 @@
 % Please edit documentation in R/coord_exchange_PML.R
 \name{coord_exchange_PML}
 \alias{coord_exchange_PML}
-\title{Search for an optimal design under the panel mixed logit model}
+\title{Search for an optimal choice experiment design under the panel mixed logit model}
 \usage{
 coord_exchange_PML(
   n_choice_set,
@@ -58,7 +58,7 @@ List object containing the following results of the coordinate exchange algorith
 }
 }
 \description{
-Search for an optimal design under the panel mixed logit model
+Search for an optimal choice experiment design under the panel mixed logit model
 }
 \examples{
 
