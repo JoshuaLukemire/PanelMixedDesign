@@ -177,12 +177,17 @@ coord_exchange_PML <- function(n_choice_set,
             stored_criterion = Inf
           }
         } else {
-          if(det(VarCovMat) < .Machine$double.eps){
-            stored_criterion = Inf
-          }else{
-            # Determinant of the variance covariance matrix
-            VarCov_det   <- det(VarCovMat)
-            stored_criterion    <- VarCov_det^(1 / nrow(VarCovMat))
+          
+          chol_VarCovMat <- tryCatch(
+            chol(VarCovMat),
+            error = function(e) NULL
+          )
+          
+          if (is.null(chol_VarCovMat)){
+            stored_criterion <- Inf
+          } else {
+            log_determinant <- 2 * sum(log(diag(chol_VarCovMat)))
+            stored_criterion <- exp(log_determinant / nrow(VarCovMat))
           }
         }
       } # end of else statement for valid (non-nan) VarCovMat value
@@ -264,10 +269,19 @@ coord_exchange_PML <- function(n_choice_set,
                   new_criterion = Inf
                 }
               } else {
-                if(det(var_cov_matrix_proposal) < .Machine$double.eps){
-                  new_criterion=Inf
-                }else{
-                  new_criterion = abs(det(var_cov_matrix_proposal))^{1/(nrow(var_cov_matrix_proposal))}
+                
+                chol_var_cov_proposal <- tryCatch(
+                  chol(var_cov_matrix_proposal),
+                  error = function(e) NULL
+                )
+                
+                if (is.null(chol_var_cov_proposal)){
+                  new_criterion <- Inf
+                } else {
+                  log_determinant <- 2 * sum(log(diag(chol_var_cov_proposal)))
+                  new_criterion <- exp(
+                    log_determinant / nrow(var_cov_matrix_proposal)
+                  )
                 }
               }
             }						     	 
