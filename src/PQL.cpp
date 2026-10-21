@@ -1,6 +1,7 @@
 // -*- mode: C++; c-indent-level: 4; c-basic-offset: 4; indent-tabs-mode: nil; -*-
 
 #include "approxutils.h"
+#include <limits>
 
 // [[Rcpp::depends(RcppEigen)]]
 
@@ -24,6 +25,40 @@ Eigen::MatrixXd get_difference_codings(Eigen::MatrixXd X,
 
 
 
+
+// Penalized negative log-likelihood for the current response and random effects.
+// Also update prob so that the objective and derivatives use the same point.
+double calculate_pql_objective(Eigen::VectorXd Y,
+                               Eigen::MatrixXd X,
+                               Eigen::VectorXd beta,
+                               Eigen::VectorXd u,
+                               Eigen::MatrixXd OmegaRE,
+                               int nChoiceSet,
+                               Eigen::VectorXd & prob){
+
+  int choice_set_size = X.rows() / nChoiceSet;
+  Eigen::VectorXd XB = X * beta;
+  Eigen::VectorXd XB_cs = Eigen::VectorXd::Zero(choice_set_size);
+  Eigen::VectorXd expXB_cs = Eigen::VectorXd::Zero(choice_set_size);
+  double objective = 0.5 * u.dot(OmegaRE * u);
+  double max_XB = 0.0;
+  double sum_expXB = 0.0;
+
+  for (int ichoice = 0; ichoice < nChoiceSet; ichoice++){
+    // Center utilities within each choice set before exponentiating.
+    XB_cs = XB.segment(ichoice*choice_set_size, choice_set_size);
+    max_XB = XB_cs.maxCoeff();
+    XB_cs = XB_cs.array() - max_XB;
+    expXB_cs = XB_cs.array().exp();
+    sum_expXB = expXB_cs.sum();
+    prob.segment(ichoice*choice_set_size, choice_set_size) = expXB_cs / sum_expXB;
+    objective += log(sum_expXB) -
+      Y.segment(ichoice*choice_set_size, choice_set_size).dot(XB_cs);
+  }
+
+  return objective;
+}
+
 //' Approximation to the information matrix using PQL
 //'
 //' @description Approximates the information matrix for the model parameters 
@@ -46,6 +81,14 @@ Eigen::MatrixXd PQL_approx_vcov(int n_samples,
                           Eigen::VectorXd var_vec,
                           int nChoiceSet){
   
+  if (n_samples <= 0 || nChoiceSet <= 0 || X.rows() == 0 ||
+      X.rows() % nChoiceSet != 0 || X.rows() / nChoiceSet < 2 ||
+      X.cols() != b_mean.size() || var_vec.size() != b_mean.size() ||
+      !X.allFinite() || !b_mean.allFinite() || !var_vec.allFinite() ||
+      (var_vec.array() < 0).any() || !(var_vec.array() > 0).any()){
+    Rcpp::stop("PQL requires consistent finite inputs, positive sample/choice-set counts, and at least one random effect.");
+  }
+
   // Determine some aspects of the design problem from the inputs
   int n_alternative_total  = X.rows(); // total number of alternatives
   int n_beta               = b_mean.size();
@@ -59,16 +102,17 @@ Eigen::MatrixXd PQL_approx_vcov(int n_samples,
     }
   }
   int n_fixed_effect = var_vec.size() - n_random_effect;
+  if (!(var_vec.head(n_random_effect).array() > 0).all()){
+    Rcpp::stop("PQL requires random-effect columns first; use varcov_approx_PML().");
+  }
+
   
   // Allocate space for final precision about the model parameters
   Eigen::MatrixXd vcov_inverse = Eigen::MatrixXd::Zero(n_beta + n_random_effect,
                                                        n_beta + n_random_effect);
   
-  // Inverse of prior covariance
-  Eigen::MatrixXd Omega = var_vec.array().inverse().matrix().asDiagonal();
-  
-  // Precision matrix only for random effects 
-  Eigen::MatrixXd OmegaRE = Omega.block(0, 0, n_random_effect, n_random_effect);
+  // Precision matrix only for random effects
+  Eigen::MatrixXd OmegaRE = var_vec.head(n_random_effect).array().inverse().matrix().asDiagonal();
   Eigen::VectorXd SigmaR  = var_vec;
 
   // Vector to store the standard deviations for each term
@@ -98,7 +142,6 @@ Eigen::MatrixXd PQL_approx_vcov(int n_samples,
   //
   // Calculate the linear predictor for each Y, draw the most likely Y
   Eigen::VectorXd XB    = Eigen::VectorXd::Zero(X.rows());
-  Eigen::VectorXd expXB = Eigen::VectorXd::Zero(X.rows());
   Eigen::VectorXd prob  = Eigen::VectorXd::Zero(n_alternative_total);
   Eigen::MatrixXd Yall  = Eigen::MatrixXd::Zero(X.rows(), n_samples);
   int yind              = 0; // for tracking which y is selected
@@ -111,12 +154,18 @@ Eigen::MatrixXd PQL_approx_vcov(int n_samples,
   Eigen::MatrixXd beta          = Eigen::MatrixXd::Zero(n_beta, 1);
   
   // Allocate space for terms in gradient descent
-  int max_iter                 = 100;
+  int max_iter                 = 200;
   bool converged               = false;
   double stepsize              = 0.0;
-  double tol                   = 0.000000001;
-  int n_samples_converged      = n_samples; // number of samples that converge for finding tilde(u)
-  double iterchange            = 0.0; // track convergence 
+  double tol                   = 0.00000001; // tolerance on the gradient
+  int max_backtrack            = 50;
+  bool accepted               = false;
+  double objective            = 0.0;
+  double objective_new        = 0.0;
+  double decrease             = 0.0;
+  double objective_tolerance  = 0.0;
+  Eigen::VectorXd beta_new    = b_mean;
+  Eigen::VectorXd prob_new    = Eigen::VectorXd::Zero(n_alternative_total);
   Eigen::VectorXd Y            = Eigen::VectorXd::Zero(X.rows());
   Eigen::VectorXd u0_mle       = Eigen::VectorXd::Zero(n_random_effect);
   Eigen::VectorXd u1_mle       = Eigen::VectorXd::Zero(n_random_effect);
@@ -136,13 +185,12 @@ Eigen::MatrixXd PQL_approx_vcov(int n_samples,
   // Loop over number of samples
   for (int iy = 0; iy < n_samples; iy++){
     XB    = X * beta_start.col(iy) + epsilon.col(iy);
-    expXB = XB.array().exp();
     // As a starting value, pick the most likely Y for each choice set
     for (int ichoice = 0; ichoice < nChoiceSet; ichoice++){
       yind=0;
       // Find the selected value for this choice set
       for (int ialt = 1; ialt < choice_set_size; ialt++){
-        if (expXB(ichoice*choice_set_size + ialt) > expXB(ichoice*choice_set_size + yind)) {
+        if (XB(ichoice*choice_set_size + ialt) > XB(ichoice*choice_set_size + yind)) {
           yind = ialt;
         }
       }
@@ -163,49 +211,76 @@ Eigen::MatrixXd PQL_approx_vcov(int n_samples,
     Y         = Yall.col(iy);
     u0_mle    = u.col(iy);
     
-    // Reset convergence indicator
+    // Reset convergence indicator. Retry from zero if needed.
     converged = false;
-    
-    // Gradient descent loop
-    for(int inewton_iter = 0; inewton_iter < max_iter; inewton_iter++){
-      
-      // Update beta using current value for U0
-      beta.block(0, 0, n_random_effect, 1)              = b_mean.segment(0, n_random_effect) + u0_mle;
-      beta.block(n_random_effect, 0, n_fixed_effect, 1) = b_mean.segment(n_random_effect, n_fixed_effect);
-      
-      
-      // Calculate response probabilities under U0_MLE
-      prob = calculate_response_probabilities(X, beta, nChoiceSet);
-  
-      // calculate diag(p) - pp'
-      delta = calculate_delta(prob, nChoiceSet);
-      
-      // from all rand effects version
-      gradient = Xr.transpose() * (Y - prob) -  OmegaRE * u0_mle;
-      
-      H = -(Xr.transpose() * delta * Xr) - OmegaRE; 
-      
-      //stepsize = 1.0 / (1.0 + 10.0 * sqrt(gradient.array().pow(2).sum() ) );
-      stepsize = 1.0;
-      
-      Hinv = H.inverse();
-      
-      u1_mle = u0_mle - stepsize*(Hinv * gradient);
-      
-      iterchange = 0.0;
-      for (int ib = 0; ib < u1_mle.size(); ib++){
-        iterchange += sqrt(pow(u1_mle(ib) - u0_mle(ib), 2));
+    for (int iattempt = 0; iattempt < 2 && !converged; iattempt++){
+      if (iattempt == 1){
+        u0_mle.setZero();
       }
-      
-      if ( iterchange < tol ){
-        converged = true;
-        inewton_iter = max_iter + 1;
-      } else {
-        u0_mle = u1_mle;
+
+      for(int inewton_iter = 0; inewton_iter < max_iter; inewton_iter++){
+        beta.block(0, 0, n_random_effect, 1) = b_mean.segment(0, n_random_effect) + u0_mle;
+        beta.block(n_random_effect, 0, n_fixed_effect, 1) = b_mean.segment(n_random_effect, n_fixed_effect);
+
+        objective = calculate_pql_objective(Y, X, beta, u0_mle, OmegaRE, nChoiceSet, prob);
+        gradient = Xr.transpose() * (Y - prob) - OmegaRE * u0_mle;
+        if (!std::isfinite(objective) || !gradient.allFinite()){
+          break;
+        }
+
+        // A small damped step alone is not enough to establish convergence.
+        if (gradient.cwiseAbs().maxCoeff() < tol){
+          converged = true;
+          break;
+        }
+
+        delta = calculate_delta(prob, nChoiceSet);
+        H = -(Xr.transpose() * delta * Xr) - OmegaRE;
+        Hinv = H.inverse();
+        decrease = -gradient.dot(Hinv * gradient);
+        if (!std::isfinite(decrease) || decrease <= 0.0){
+          break;
+        }
+
+        // Try the full Newton step, then halve it until the objective decreases.
+        stepsize = 1.0;
+        accepted = false;
+        objective_tolerance = 16.0 * std::numeric_limits<double>::epsilon() *
+          (1.0 + fabs(objective));
+        for (int ibacktrack = 0; ibacktrack < max_backtrack; ibacktrack++){
+          u1_mle = u0_mle - stepsize * (Hinv * gradient);
+          beta_new = b_mean;
+          beta_new.head(n_random_effect) += u1_mle;
+          objective_new = calculate_pql_objective(Y, X, beta_new, u1_mle, OmegaRE, nChoiceSet, prob_new);
+
+          if (std::isfinite(objective_new) &&
+              objective_new <= objective - 0.0001 * stepsize * decrease + objective_tolerance){
+            u0_mle = u1_mle;
+            accepted = true;
+            break;
+          }
+          stepsize *= 0.5;
+        }
+        if (!accepted){
+          break;
+        }
       }
-    } // end of newton iterations
-    
-    
+
+      // Check the final accepted point and refresh probabilities for information.
+      beta = b_mean;
+      beta.block(0, 0, n_random_effect, 1) += u0_mle;
+      objective = calculate_pql_objective(Y, X, beta, u0_mle, OmegaRE, nChoiceSet, prob);
+      gradient = Xr.transpose() * (Y - prob) - OmegaRE * u0_mle;
+      converged = std::isfinite(objective) && gradient.allFinite() &&
+        gradient.cwiseAbs().maxCoeff() < tol;
+    }
+
+    if (!converged){
+      Rcpp::stop("PQL mode solver failed for draw %d of %d; covariance was not computed.",
+                 iy + 1, n_samples);
+    }
+    delta = calculate_delta(prob, nChoiceSet);
+
     if (converged == true){
       
       // Grab the elements of the Delta matrix corresponding to difference matrix (XDX)
@@ -228,8 +303,6 @@ Eigen::MatrixXd PQL_approx_vcov(int n_samples,
         SigmaR.array().sqrt().matrix().asDiagonal();
       
       
-    } else { // case where outer newton did not converge, decrease n_samples_converged counter
-      n_samples_converged -= 1;
     }
     
   } // end of loop over Y
@@ -239,7 +312,7 @@ Eigen::MatrixXd PQL_approx_vcov(int n_samples,
   // Normalize by number of replicates of Y
   for (int i = 0; i < n_beta + n_random_effect; i++){
     for (int j = 0; j < n_beta + n_random_effect; j++){
-      vcov_inverse(i,j) *= 1.0 / n_samples_converged;
+      vcov_inverse(i,j) *= 1.0 / n_samples;
     }
   }
   
