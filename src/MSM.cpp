@@ -47,7 +47,7 @@ Eigen::MatrixXd MSM_approx_vcov(int n_samples,
   // Sample betas (via u) for each draw of Y
   Eigen::MatrixXd beta   = Eigen::MatrixXd::Zero(b_mean.size(), n_samples); // each column is a sample of beta
   Eigen::VectorXd beta_i = Eigen::VectorXd::Zero(n_random_effect);
-  Eigen::MatrixXd u      = Eigen::MatrixXd::Zero(n_random_effect, n_samples);
+  Eigen::MatrixXd u      = Eigen::MatrixXd::Zero(n_beta, n_samples);
   Eigen::VectorXd sd_vec = var_vec.array().sqrt();
   Eigen::MatrixXd sd_mat = sd_vec.asDiagonal();
   for (int ip = 0; ip < n_random_effect; ip++){
@@ -244,7 +244,7 @@ Eigen::MatrixXd MSM_approx_vcov(int n_samples,
         } // /jalt
         
         for (int iparam = 0; iparam < b_mean.size(); iparam++){
-          U21(ialt*n_alternative + ialt2, iparam) = epp(ialt*n_alternative + ialt2, iparam) * 
+          U21(ialt*n_alternative + ialt2, iparam) = epp(ialt*n_alternative + ialt2) * 
             (X(ialt, iparam)+X(ialt2, iparam)) -
             U21temp(iparam);
           U22(ialt*n_alternative + ialt2, iparam) = (X(ialt, iparam) + X(ialt2, iparam)) * 
@@ -286,9 +286,9 @@ Eigen::MatrixXd MSM_approx_vcov(int n_samples,
                                               n_beta + n_random_effect );
   
   DU.block(0, 0, n_beta, n_beta) = DU11;
-  DU.block(0, n_beta, n_beta, n_random_effect) = DU12;
-  DU.block(n_beta, 0, n_random_effect, n_beta) = DU21;
-  DU.block(n_beta, n_beta, n_random_effect, n_random_effect) = DU22.block(0, 0, n_random_effect, n_random_effect);
+  DU.block(0, n_beta, n_beta, n_random_effect) = DU12.leftCols(n_random_effect);
+  DU.block(n_beta, 0, n_random_effect, n_beta) = DU21.topRows(n_random_effect);
+  DU.block(n_beta, n_beta, n_random_effect, n_random_effect) = DU22.topLeftCorner(n_random_effect, n_random_effect);
   
   Eigen::MatrixXd stackedMatrix = Eigen::MatrixXd::Zero( 2*(b_mean.size() + n_random_effect), b_mean.size() + n_random_effect);
   stackedMatrix.block(0, 0, b_mean.size() + n_random_effect, b_mean.size() + n_random_effect) = DU;
