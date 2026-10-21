@@ -223,7 +223,7 @@ Eigen::MatrixXd PQL_approx_vcov(int n_samples,
       // Increment components of precision matrix
       I11Temp = XDX.transpose() * VnInv * XDX;
       I11 += I11Temp;
-      I22 += (2.0 * SigmaR.array()).sqrt().matrix().asDiagonal() * 
+      I22 += 2.0 * (SigmaR.array()).sqrt().matrix().asDiagonal() * 
         I11Temp.array().pow(2).matrix() * 
         SigmaR.array().sqrt().matrix().asDiagonal();
       
