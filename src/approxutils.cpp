@@ -88,11 +88,9 @@ Eigen::VectorXd normalize_probabilities(Eigen::VectorXd probs,
 // uses GetRNGstate and PutRNGstate since not exported
 Eigen::VectorXd sample_epsilon(int n_alternative_total){
   Eigen::VectorXd eps = Eigen::VectorXd::Zero(n_alternative_total);
-  GetRNGstate();
   for (int ii = 0; ii < n_alternative_total; ii++){
     eps(ii) = R::runif(0.0, 1.0);
   }
-  PutRNGstate();
   eps = (eps.array().log() * (-1.0) ).log() * (-1.0);
   return eps;
 }
