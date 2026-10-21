@@ -6,7 +6,7 @@
 
 // Function to draw a sample of responses based on the linear predictor
 Eigen::MatrixXd impsamp_draw_response_vector(Eigen::VectorXd expXB,
-                                             Eigen::VectorXd X,
+                                             const Eigen::MatrixXd& X,
                                              int n_choice_set){
   
   // Get the number of alternatives per choice set
