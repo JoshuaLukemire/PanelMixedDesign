@@ -92,7 +92,7 @@ MQL_approx_vcov <- function(model_matrix,
   I11 <- t(model_matrix_differenced) %*% Vn_inverse_X 
   
   # Lower right block of information matrix
-  I22 <- 0.5 * diag(sqrt(effect_var)) %*% I11^2 %*% diag(sqrt(effect_var))
+  I22 <- 2 * diag(sqrt(effect_var)) %*% I11^2 %*% diag(sqrt(effect_var))
 
   # # Variance Covariance Matrix via inversion of information matrix
   # vcov_mql                        <- matrix(0,dimb+dimbr,dimb+dimbr)
