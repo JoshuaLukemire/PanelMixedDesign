@@ -83,6 +83,21 @@ varcov_approx_PML <- function(X,
                "does not match length of effect_vars:",
                length(effect_vars)))
   }
+
+  # Make sure at least two coefs
+  if (length(effect_means) < 2) {
+    stop("At least two coefficients are required.")
+  }
+
+  if (!is.numeric(effect_vars) ||
+      any(!is.finite(effect_vars)) ||
+      any(effect_vars < 0)) {
+    stop("effect_vars must contain finite, non-negative variances.")
+  }
+
+  if (!any(effect_vars > 0)) {
+    stop("At least one random effect is required; all-fixed models are not supported.")
+  }
   
   # Check if the model matrix is (clearly) the wrong dimension
   if (nrow(X) / n_choice_set != round(nrow(X) / n_choice_set)){
