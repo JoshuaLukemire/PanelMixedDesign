@@ -34,10 +34,7 @@ Eigen::MatrixXd impsamp_draw_response_vector(Eigen::VectorXd expXB,
     ind = 0;
     double cumu_prob = 0.0;
     
-    // Not exported via Rcpp, so need to pull RNG info
-    GetRNGstate();
     rdraw = R::runif(0.0, 1.0);
-    PutRNGstate();
     
     // Loop over alternatives and pick the most likely
     for (int ialt = 0; ialt < choice_set_size; ialt++){
