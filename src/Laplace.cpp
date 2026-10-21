@@ -1,13 +1,73 @@
 // -*- mode: C++; c-indent-level: 4; c-basic-offset: 4; indent-tabs-mode: nil; -*-
 
 #include "approxutils.h"
+#include <limits>
 
 // [[Rcpp::depends(RcppEigen)]]
 
 
-//
-// Newtons method to find MLE(u0)
-//
+// Evaluate the negative log integrand for the requested Laplace integral.
+// integral_type: 0 = denominator, 1 = probability numerator, 2 = shifted square.
+double calculate_laplace_objective(Eigen::VectorXd Y,
+                                   Eigen::MatrixXd X,
+                                   Eigen::VectorXd beta,
+                                   Eigen::VectorXd u,
+                                   Eigen::MatrixXd OmegaRE,
+                                   Eigen::VectorXd SigmaRE,
+                                   int n_choice_set,
+                                   double addc,
+                                   int integral_type,
+                                   int integral_index,
+                                   Eigen::VectorXd & prob){
+  int choice_set_size = X.rows() / n_choice_set;
+  Eigen::VectorXd XB = X * beta;
+  Eigen::VectorXd XB_cs = Eigen::VectorXd::Zero(choice_set_size);
+  Eigen::VectorXd log_prob = Eigen::VectorXd::Zero(X.rows());
+  double objective = 0.5 * u.dot(OmegaRE * u);
+  double max_XB = 0.0;
+  double log_sum_expXB = 0.0;
+
+  for (int ichoice = 0; ichoice < n_choice_set; ichoice++){
+    XB_cs = XB.segment(ichoice*choice_set_size, choice_set_size);
+    max_XB = XB_cs.maxCoeff();
+    XB_cs = XB_cs.array() - max_XB;
+    log_sum_expXB = log(XB_cs.array().exp().sum());
+    log_prob.segment(ichoice*choice_set_size, choice_set_size) =
+      XB_cs.array() - log_sum_expXB;
+  }
+  prob = log_prob.array().exp();
+  objective -= Y.dot(log_prob);
+
+  if (integral_type == 1){
+    objective -= log_prob(integral_index);
+  }
+  if (integral_type == 2){
+    objective -= log(pow(u(integral_index), 2) /
+      pow(sqrt(SigmaRE(integral_index)), 3) + addc);
+  }
+  return objective;
+}
+
+// All integral ratios share the same constants, so only this log determinant
+// and the negative log integrand are needed. Require a local maximum.
+double calculate_laplace_log_determinant(Eigen::MatrixXd H,
+                                         int iy,
+                                         int integral_type,
+                                         int integral_index){
+  if (!H.allFinite()){
+    Rcpp::stop("Laplace Hessian is not finite for draw %d, integral type %d, index %d.",
+               iy + 1, integral_type, integral_index + 1);
+  }
+  Eigen::LLT<Eigen::MatrixXd> H_factor(-H);
+  if (H_factor.info() != Eigen::Success){
+    Rcpp::stop("Laplace mode has invalid curvature for draw %d, integral type %d, index %d.",
+               iy + 1, integral_type, integral_index + 1);
+  }
+  Eigen::MatrixXd chol_H = H_factor.matrixU();
+  return 2.0 * chol_H.diagonal().array().log().sum();
+}
+
+// Newton mode searches and Laplace information calculation.
 Eigen::MatrixXd laplace_apply_newton_method(Eigen::MatrixXd Yall,
                                             Eigen::MatrixXd X,
                                             Eigen::MatrixXd u,
@@ -24,7 +84,6 @@ Eigen::MatrixXd laplace_apply_newton_method(Eigen::MatrixXd Yall,
   int n_alternative_total = X.rows();
   int choice_set_size     = n_alternative_total / n_choice_set;
   int n_samples           = Yall.cols();
-  int n_samples_converged = Yall.cols(); // actual number of valid samples we have to work with
   
   
   // Inverse of random effects variance and corresponding subblock (columns)
@@ -36,25 +95,19 @@ Eigen::MatrixXd laplace_apply_newton_method(Eigen::MatrixXd Yall,
   Eigen::VectorXd u0_mle     = Eigen::VectorXd::Zero(n_random_effect);
   Eigen::VectorXd mstart     = Eigen::VectorXd::Zero(n_random_effect);
   Eigen::VectorXd u1_mle     = Eigen::VectorXd::Zero(n_random_effect);
-  Eigen::VectorXd ustart_mle = Eigen::VectorXd::Zero(n_random_effect);
   Eigen::VectorXd Epy        = Eigen::VectorXd::Zero(X.rows());
   Eigen::VectorXd Eu2        = Eigen::VectorXd::Zero(n_random_effect);
-  Eigen::VectorXd numerator  = Eigen::VectorXd::Zero(X.rows());
-  Eigen::VectorXd numerator2 = Eigen::VectorXd::Zero(n_random_effect);
+  Eigen::VectorXd log_numerator  = Eigen::VectorXd::Zero(X.rows());
+  Eigen::VectorXd log_numerator2 = Eigen::VectorXd::Zero(n_random_effect);
   Eigen::VectorXd prob       = Eigen::VectorXd::Zero(n_alternative_total);
   Eigen::VectorXd norm_prob  = Eigen::VectorXd::Zero(n_alternative_total);
   Eigen::MatrixXd delta      = Eigen::MatrixXd::Zero(n_alternative_total, n_alternative_total);
-  Eigen::VectorXd gradient   = Eigen::VectorXd::Zero(X.cols());
-  Eigen::VectorXd Ej         = Eigen::VectorXd::Zero(n_random_effect);
+  Eigen::VectorXd gradient   = Eigen::VectorXd::Zero(n_random_effect);
   Eigen::MatrixXd H          = Eigen::MatrixXd::Zero(n_random_effect, n_random_effect);
   Eigen::MatrixXd Hinv       = Eigen::MatrixXd::Zero(n_random_effect, n_random_effect);
-  Eigen::MatrixXd Hd         = Eigen::MatrixXd::Zero(n_random_effect, n_random_effect); // stores inverse H
   
   // Intermediate terms related to maximization
   Eigen::VectorXd SigmaRE          = Sigma_R.segment(0, n_random_effect);
-  Eigen::VectorXd inv_Sigma_R_term = (2.0 * 3.14159265 * SigmaRE);
-  inv_Sigma_R_term                 = inv_Sigma_R_term.array().rsqrt(); // reciprical square root
-  Eigen::VectorXd exp_u_ratio_term = Eigen::VectorXd::Zero(n_random_effect);
   
   // Allocate space for a single sample (temporary variable)
   Eigen::VectorXd Y = Eigen::VectorXd::Zero(Yall.rows());
@@ -63,12 +116,7 @@ Eigen::MatrixXd laplace_apply_newton_method(Eigen::MatrixXd Yall,
   Eigen::VectorXd beta   = b_mean;
   
   // Model Matrix for a given choice set
-  Eigen::MatrixXd X_cs      = Eigen::MatrixXd::Zero(choice_set_size, X.cols());
   Eigen::MatrixXd X_cs_rdm  = Eigen::MatrixXd::Zero(choice_set_size, n_random_effect);
-  
-  // Linear predictor for given choice set
-  Eigen::VectorXd XB       = Eigen::VectorXd::Zero(X.rows());
-  Eigen::VectorXd expXB    = Eigen::VectorXd::Zero(X.rows());
   
   // Variables related to inverse of variance-covariance
   Eigen::VectorXd score1        = Eigen::VectorXd::Zero(n_parameter);
@@ -77,304 +125,326 @@ Eigen::MatrixXd laplace_apply_newton_method(Eigen::MatrixXd Yall,
   Eigen::MatrixXd I12           = Eigen::MatrixXd::Zero(n_parameter, n_random_effect);
   Eigen::MatrixXd I22           = Eigen::MatrixXd::Zero(n_random_effect, n_random_effect);
   
-  // Scalar terms related to maximization
-  double Hd_det   = 0.0;
-  double denom    = 0.0;
-  
   // Terms related to algorithm
   bool converged    = false;
-  double tol        = 0.000000001;
+  double tol        = 0.000000000001; // shifted-square ratios need accurate modes
   double stepsize   = 0.0;
-  int max_iter      = 100;
+  int max_iter      = 200;
   double addc       = 10000.0;
   double mleterm    = 0.0;
-  double iterchange = 0.0;
   int i1            = 0;
   
   // stores p for a choice set, used in coverged = true loop
   Eigen::VectorXd pj = Eigen::VectorXd::Zero(choice_set_size);
   
-  // Loop over all samples of Y
+  int max_backtrack = 50;
+  bool accepted = false;
+  double objective = 0.0;
+  double objective_new = 0.0;
+  double objective_tolerance = 0.0;
+  double decrease = 0.0;
+  double log_denom = 0.0;
+  double log_H_det = 0.0;
+  Eigen::VectorXd direction = Eigen::VectorXd::Zero(n_random_effect);
+  Eigen::VectorXd beta_new = b_mean;
+  Eigen::VectorXd prob_new = Eigen::VectorXd::Zero(n_alternative_total);
+
+  // Integral types: 0 = denominator, 1 = probability, 2 = shifted square.
   for (int iy = 0; iy < n_samples; iy++){
-    
-    // Isolate Y, starting value for u
-    Y         = Yall.col(iy);
-    u0_mle    = u.col(iy);
+    Y = Yall.col(iy);
+    u0_mle = u.col(iy);
+
+    // Denominator mode.
     converged = false;
-    
-    // Find u1 mle via newton's method
-    for(int inewton_iter = 0; inewton_iter < max_iter; inewton_iter++){
-      
-      beta.segment(0, n_random_effect)              = b_mean.segment(0, n_random_effect) + u0_mle;
-      beta.segment(n_random_effect, n_fixed_effect) = b_mean.segment(n_random_effect, n_fixed_effect);
-      
-      // Calculate response probabilities under U0_MLE
-      prob = calculate_response_probabilities(X, beta, n_choice_set);
-      
-      // Calculate diag(p) - pp' under U0_MLE
-      delta = calculate_delta(prob, n_choice_set);
-      
-      // Corresponding gradient
-      gradient = XR.transpose() * (Y - prob) -  OmegaRE * u0_mle;
-      
-      // Hess
-      H = -(XR.transpose() * delta * XR) - OmegaRE;
-      
-      //stepsize = 1.0 / (1.0 + 10.0 * sqrt(gradient.array().pow(2).sum() ) );
-      stepsize = 1.0;
-      
-      // Inverse Hess
-      Hinv = H.inverse();
-      
-      // Increment mle
-      u1_mle = u0_mle - stepsize*(Hinv * gradient);
-      
-      // Evaluate change at this iteration
-      iterchange = 0.0;
-      for (int ib = 0; ib < u1_mle.size(); ib++){
-        iterchange += sqrt(pow(u1_mle(ib) - u0_mle(ib), 2));
+    for (int iattempt = 0; iattempt < 2 && !converged; iattempt++){
+      if (iattempt == 1){
+        u0_mle.setZero();
       }
-      
-      // Check if converged
-      if ( iterchange < tol ){
-        converged = true;
-        inewton_iter = max_iter + 1;
-        u0_mle = u1_mle;
-      } else {
-        u0_mle = u1_mle;
-      }
-      
-    } // end of newton iterations
-    
-    // If newton's algorithm didn't converge, move on to next sample
-    if (converged == true){
-      
-      // Negative inv hess and corresponding determinant
-      Hd     = -H.inverse();
-      Hd_det = Hd.determinant();
-      
-      // u^2 / sigma
-      exp_u_ratio_term = (
-        -1.0*(u0_mle.array().pow(2)) * 
-          (2.0 * SigmaRE.array()).inverse().array()
-      ).exp();
-      
-      // Denominator
-      denom = sqrt(Hd_det) *
-        prob.array().pow(Y.array()).prod() * 
-        (inv_Sigma_R_term.array() * exp_u_ratio_term.array()).prod();
-      
-      // The next nested loops cycle through each alternative one at a time
-      // goal is to obtain numerator needed to evaluate E_u[p | y^(i)]
-      mstart = u0_mle;
-      for (int j1 = 0; j1 < X.rows(); j1++){
-        
-        // Start at u0_mle from first newton application
-        u0_mle = mstart;
-        
-        // Isolate information from this choice set
-        i1       = (j1 / choice_set_size); // indexes which choice set this alternative is a member of
-        X_cs     = X.block(i1*choice_set_size, 0, choice_set_size, n_parameter);
-        X_cs_rdm = X.block(i1*choice_set_size, 0, choice_set_size, n_random_effect);
-        
-        // Inner newton, calculate the numerator for ratio in laplace approximation
-        // (not actually trying to get a new u here)
-        for (int i_n = 0; i_n < max_iter; i_n++){
-          
-          beta.segment(0, n_random_effect)              = b_mean.segment(0, n_random_effect) + u0_mle;
-          beta.segment(n_random_effect, n_fixed_effect) = b_mean.segment(n_random_effect, n_fixed_effect);
-          
-          // Response probabilities at current version of u
-          prob = calculate_response_probabilities(X, beta, n_choice_set);
-          
-          // diag(p) - pp' at current version of u
-          delta = calculate_delta(prob, n_choice_set);
-          
-          // Extract probabilities corresponding to current choice set
-          pj = prob.block(i1*choice_set_size, 0, choice_set_size, 1).array();
-          pj(j1 % choice_set_size) = -1.0 + pj(j1 % choice_set_size);
-          pj *= -1.0;
-          
-          // Evaluate grad
-          gradient = X_cs_rdm.transpose() * pj +
-            XR.transpose() * (Y - prob) -
-            OmegaRE * u0_mle;
-          
-          // Evaluate hess and its inverse
-          H = -(
-            X_cs_rdm.transpose() * 
-              delta.block(i1*choice_set_size, i1*choice_set_size,
-                          choice_set_size, choice_set_size) *
-                            X_cs_rdm
-          ) - (XR.transpose() * delta * XR ) - OmegaRE;
-          Hinv = H.inverse();
-          
-          //stepsize = 1 / (1 + 10 * sqrt(gradient.array().pow(2).sum() ) );
-          stepsize = 1.0;
-          
-          // Incr u0_mle
-          u1_mle = u0_mle - stepsize*(Hinv * gradient);
-          
-          // Evaluate change at this iteration
-          iterchange = 0.0;
-          for (int ib = 0; ib < u1_mle.size(); ib++){
-            iterchange += sqrt(pow(u1_mle(ib) - u0_mle(ib), 2));
-          }
-          
-          // Check for convergence
-          if ( iterchange < tol ){
-            i_n = max_iter + 1;
+      for (int inewton_iter = 0; inewton_iter < max_iter; inewton_iter++){
+        beta = b_mean;
+        beta.head(n_random_effect) += u0_mle;
+        objective = calculate_laplace_objective(Y, X, beta, u0_mle, OmegaRE,
+          SigmaRE, n_choice_set, addc, 0, -1, prob);
+        delta = calculate_delta(prob, n_choice_set);
+        gradient = XR.transpose() * (Y - prob) - OmegaRE * u0_mle;
+        H = -(XR.transpose() * delta * XR) - OmegaRE;
+        if (!std::isfinite(objective) || !gradient.allFinite()){
+          break;
+        }
+        if (gradient.cwiseAbs().maxCoeff() < tol){
+          converged = true;
+          break;
+        }
+
+        Hinv = H.inverse();
+        direction = -(Hinv * gradient);
+        decrease = gradient.dot(direction);
+        if (!direction.allFinite() || !std::isfinite(decrease) || decrease <= 0.0){
+          // A numerator Hessian need not be negative definite away from its mode.
+          // Use a bounded gradient direction if Newton is not a descent direction.
+          direction = gradient / (1.0 + gradient.norm());
+          decrease = gradient.dot(direction);
+        }
+        if (!std::isfinite(decrease) || decrease <= 0.0){
+          break;
+        }
+
+        stepsize = 1.0;
+        accepted = false;
+        objective_tolerance = 16.0 * std::numeric_limits<double>::epsilon() *
+          (1.0 + fabs(objective));
+        for (int ibacktrack = 0; ibacktrack < max_backtrack; ibacktrack++){
+          u1_mle = u0_mle + stepsize * direction;
+          beta_new = b_mean;
+          beta_new.head(n_random_effect) += u1_mle;
+          objective_new = calculate_laplace_objective(Y, X, beta_new, u1_mle,
+            OmegaRE, SigmaRE, n_choice_set, addc, 0, -1, prob_new);
+          if (std::isfinite(objective_new) &&
+              objective_new <= objective - 0.0001 * stepsize * decrease + objective_tolerance){
             u0_mle = u1_mle;
-          } else {
-            u0_mle = u1_mle;
+            accepted = true;
+            break;
           }
-        } // end of inner (converged) newton loop
-        
-        Hd     = -H.inverse();
-        Hd_det = Hd.determinant();
-        
-        // Numerator for alternative j1
-        exp_u_ratio_term = (-1.0*(u0_mle.array().pow(2)) * (2.0 * SigmaRE.array()).inverse()).exp();
-        numerator(j1) = sqrt(Hd_det) * prob(j1) *
-          prob.array().pow(Y.array()).prod() *
-          (inv_Sigma_R_term.array() * exp_u_ratio_term.array()).prod();
-        
-      } // end of loop over individual alternatives (j1)
-      
-      // Second version, calculating numerator for random effect terms
-      // Goal is to obtain numerator needed to evaluate E_u[u^3 / sigma^3 | y^(i)]
-      // requires u_1j, for j indexing random effects
-      for (int irandeff = 0; irandeff < n_random_effect; irandeff++){
-        
-        // Start at previous maximizer
-        u0_mle = mstart; 
-        
-        // Zero out Ej and then isolate the current effect (1)
-        Ej           = Eigen::VectorXd::Zero(Ej.size());
-        Ej(irandeff) = 1.0;
-        
-        // Find u_1j, the maximizer of
-        // log( (u_ij^2+csigmaj^3) / (sigmaj^3) ) + log P(Y = y^(i) | u) + log f_sigma(u)
-        for (int newton_iter_2 = 0; newton_iter_2 < max_iter; newton_iter_2++){
-          
-          // Set beta
-          beta.segment(0, n_random_effect)              = b_mean.segment(0, n_random_effect) + u0_mle;
-          beta.segment(n_random_effect, n_fixed_effect) = b_mean.segment(n_random_effect, n_fixed_effect);
-          
-          // Calculate probabilities at beta
-          prob = calculate_response_probabilities(X, beta, n_choice_set);
-          
-          // Calculate diag(p) - pp' at this value
-          delta = calculate_delta(prob, n_choice_set);
-          
-          // Evaluate gradient
-          gradient = (XR.transpose() * (Y - prob)) - 
-            OmegaRE * u0_mle;
-          
-          // Construct part of term (intermediate step)
-          mleterm = (
-            2.0 * u0_mle(irandeff) / 
-              (
-                  pow(u0_mle(irandeff), 2) +
-                    addc * pow(sqrt(SigmaRE(irandeff)), 3) 
-              ) 
-          ) ;
-          
-          // update gradient
-          gradient(irandeff) += mleterm;//(mleterm * Ej.array()).matrix();
-          
-          // finalize calculation of mle term
-          mleterm = 2.0 * (
-            addc * pow(sqrt(Sigma_R(irandeff)), 3) - pow(u0_mle(irandeff), 2)
-          ) /
-            pow( pow(u0_mle(irandeff), 2) + addc * pow(sqrt(SigmaRE(irandeff)), 3), 2);
-          
-          // Evaluate hess (partial)
-          H = Ej * Ej.transpose();
-          for (int iel = 0; iel < n_random_effect; iel++){
-            for (int iel2 = 0; iel2 < n_random_effect; iel2++){
-              H(iel, iel2) *= mleterm;
-            }
-          }
-          // Finalize
-          H    = H - XR.transpose() * delta * XR - OmegaRE;
-          
-          // Invert
-          Hinv = H.inverse();
-          
-          //stepsize = 1 / (1 + 10 * sqrt(gradient.array().pow(2).sum()) );
-          stepsize = 1.0;
-          
-          // Increment u
-          u1_mle = u0_mle - stepsize*(Hinv * gradient);
-          
-          // Calculate change
-          iterchange = 0.0;
-          for (int ib = 0; ib < u1_mle.size(); ib++){
-            iterchange += sqrt(pow(u1_mle(ib) - u0_mle(ib), 2));
-          }
-          
-          // Check for convergence
-          if ( iterchange < tol ){
-            newton_iter_2 = max_iter + 1;
-            u0_mle = u1_mle;
-          } else {
-            u0_mle = u1_mle;
-          }
-          
-        } // end of newton loop (inner, random effect)
-        
-        // Hd
-        Hd     = -H.inverse();
-        Hd_det = Hd.determinant();
-        
-        // Evaluate the second numerator needed for laplace approximation 
-        exp_u_ratio_term = (-1.0*(u0_mle.array().pow(2)) * (2.0 * SigmaRE.array()).inverse()).exp();
-        numerator2(irandeff) = sqrt(Hd_det) *
-          (
-              (pow(u0_mle(irandeff), 2) + addc * pow(sqrt(SigmaRE(irandeff)), 3)) /
-                pow(sqrt(SigmaRE(irandeff)), 3)
-          ) * prob.array().pow(Y.array()).prod() *
-            (
-                inv_Sigma_R_term.array() * exp_u_ratio_term.array()
-            ).prod();
-        
-        
-      } // End of random effect loop for Laplace numerator calculation
-      
-      // Ratio for first expectation, E_u[p | y^(i)]
-      for (int i = 0; i < X.rows(); i++){
-        Epy(i) = numerator(i) / denom;
-      }
-      
-      // Now need to normalize the probabilities
-      norm_prob = normalize_probabilities(Epy, n_choice_set);
-      
-      // Ratio for second expectation, E_u[u^3 / sigma^3 | y^(i)]
-      for (int i = 0; i < n_random_effect; i++){
-        Eu2(i) = numerator2(i) / denom - addc;
-        if (Eu2(i) < 0.0){
-          Eu2(i) *= -1.0;
+          stepsize *= 0.5;
+        }
+        if (!accepted){
+          break;
         }
       }
-      
-      // Evaluate score terms
-      score1 = X.transpose() * (Y - norm_prob);
-      score2 = -(SigmaRE.array().rsqrt()) + Eu2.array(); 
-      
-      // Increment inverse of variance covariance matrix
-      I11 += score1 * score1.transpose();
-      I12 += score1 * score2.transpose();
-      I22 += score2 * score2.transpose();
-      
-    } else { // case where outer newton did not converge, decrease n_samples_converged
-      n_samples_converged -= 1;
+
+      // Re-evaluate the objective, gradient, and Hessian at the accepted point.
+      beta = b_mean;
+      beta.head(n_random_effect) += u0_mle;
+      objective = calculate_laplace_objective(Y, X, beta, u0_mle, OmegaRE,
+        SigmaRE, n_choice_set, addc, 0, -1, prob);
+      delta = calculate_delta(prob, n_choice_set);
+      gradient = XR.transpose() * (Y - prob) - OmegaRE * u0_mle;
+      H = -(XR.transpose() * delta * XR) - OmegaRE;
+      converged = std::isfinite(objective) && gradient.allFinite() &&
+        gradient.cwiseAbs().maxCoeff() < tol;
     }
-    
-    
-  } // end of loop over Y
-  
-  
+    if (!converged){
+      Rcpp::stop("Laplace mode solver failed for draw %d, integral type %d, index %d; covariance was not computed.",
+                 iy + 1, 0, -1 + 1);
+    }
+
+    log_H_det = calculate_laplace_log_determinant(H, iy, 0, -1);
+    log_denom = -objective - 0.5 * log_H_det;
+    mstart = u0_mle;
+
+    // Probability numerator modes.
+    for (int j1 = 0; j1 < X.rows(); j1++){
+      u0_mle = mstart;
+      i1 = j1 / choice_set_size;
+      X_cs_rdm = X.block(i1*choice_set_size, 0, choice_set_size, n_random_effect);
+      converged = false;
+      for (int iattempt = 0; iattempt < 2 && !converged; iattempt++){
+        if (iattempt == 1){
+          u0_mle.setZero();
+        }
+        for (int inewton_iter = 0; inewton_iter < max_iter; inewton_iter++){
+          beta = b_mean;
+          beta.head(n_random_effect) += u0_mle;
+          objective = calculate_laplace_objective(Y, X, beta, u0_mle, OmegaRE,
+            SigmaRE, n_choice_set, addc, 1, j1, prob);
+          delta = calculate_delta(prob, n_choice_set);
+          pj = prob.segment(i1*choice_set_size, choice_set_size);
+          pj(j1 % choice_set_size) -= 1.0;
+          pj *= -1.0;
+          gradient = X_cs_rdm.transpose() * pj +
+            XR.transpose() * (Y - prob) - OmegaRE * u0_mle;
+          H = -(X_cs_rdm.transpose() *
+            delta.block(i1*choice_set_size, i1*choice_set_size,
+                        choice_set_size, choice_set_size) * X_cs_rdm) -
+            XR.transpose() * delta * XR - OmegaRE;
+          if (!std::isfinite(objective) || !gradient.allFinite()){
+            break;
+          }
+          if (gradient.cwiseAbs().maxCoeff() < tol){
+            converged = true;
+            break;
+          }
+
+          Hinv = H.inverse();
+          direction = -(Hinv * gradient);
+          decrease = gradient.dot(direction);
+          if (!direction.allFinite() || !std::isfinite(decrease) || decrease <= 0.0){
+            // A numerator Hessian need not be negative definite away from its mode.
+            // Use a bounded gradient direction if Newton is not a descent direction.
+            direction = gradient / (1.0 + gradient.norm());
+            decrease = gradient.dot(direction);
+          }
+          if (!std::isfinite(decrease) || decrease <= 0.0){
+            break;
+          }
+
+          stepsize = 1.0;
+          accepted = false;
+          objective_tolerance = 16.0 * std::numeric_limits<double>::epsilon() *
+            (1.0 + fabs(objective));
+          for (int ibacktrack = 0; ibacktrack < max_backtrack; ibacktrack++){
+            u1_mle = u0_mle + stepsize * direction;
+            beta_new = b_mean;
+            beta_new.head(n_random_effect) += u1_mle;
+            objective_new = calculate_laplace_objective(Y, X, beta_new, u1_mle,
+              OmegaRE, SigmaRE, n_choice_set, addc, 1, j1, prob_new);
+            if (std::isfinite(objective_new) &&
+                objective_new <= objective - 0.0001 * stepsize * decrease + objective_tolerance){
+              u0_mle = u1_mle;
+              accepted = true;
+              break;
+            }
+            stepsize *= 0.5;
+          }
+          if (!accepted){
+            break;
+          }
+        }
+
+        // Re-evaluate the objective, gradient, and Hessian at the accepted point.
+        beta = b_mean;
+        beta.head(n_random_effect) += u0_mle;
+        objective = calculate_laplace_objective(Y, X, beta, u0_mle, OmegaRE,
+          SigmaRE, n_choice_set, addc, 1, j1, prob);
+        delta = calculate_delta(prob, n_choice_set);
+        pj = prob.segment(i1*choice_set_size, choice_set_size);
+        pj(j1 % choice_set_size) -= 1.0;
+        pj *= -1.0;
+        gradient = X_cs_rdm.transpose() * pj +
+          XR.transpose() * (Y - prob) - OmegaRE * u0_mle;
+        H = -(X_cs_rdm.transpose() *
+          delta.block(i1*choice_set_size, i1*choice_set_size,
+                      choice_set_size, choice_set_size) * X_cs_rdm) -
+          XR.transpose() * delta * XR - OmegaRE;
+        converged = std::isfinite(objective) && gradient.allFinite() &&
+          gradient.cwiseAbs().maxCoeff() < tol;
+      }
+      if (!converged){
+        Rcpp::stop("Laplace mode solver failed for draw %d, integral type %d, index %d; covariance was not computed.",
+                   iy + 1, 1, j1 + 1);
+      }
+
+      log_H_det = calculate_laplace_log_determinant(H, iy, 1, j1);
+      log_numerator(j1) = -objective - 0.5 * log_H_det;
+    }
+
+    // Shifted-square numerator modes. Keep the original addc approximation.
+    for (int irandeff = 0; irandeff < n_random_effect; irandeff++){
+      u0_mle = mstart;
+      converged = false;
+      for (int iattempt = 0; iattempt < 2 && !converged; iattempt++){
+        if (iattempt == 1){
+          u0_mle.setZero();
+        }
+        for (int inewton_iter = 0; inewton_iter < max_iter; inewton_iter++){
+          beta = b_mean;
+          beta.head(n_random_effect) += u0_mle;
+          objective = calculate_laplace_objective(Y, X, beta, u0_mle, OmegaRE,
+            SigmaRE, n_choice_set, addc, 2, irandeff, prob);
+          delta = calculate_delta(prob, n_choice_set);
+          gradient = XR.transpose() * (Y - prob) - OmegaRE * u0_mle;
+          mleterm = 2.0 * u0_mle(irandeff) /
+            (pow(u0_mle(irandeff), 2) + addc * pow(sqrt(SigmaRE(irandeff)), 3));
+          gradient(irandeff) += mleterm;
+          mleterm = 2.0 * (addc * pow(sqrt(SigmaRE(irandeff)), 3) -
+            pow(u0_mle(irandeff), 2)) /
+            pow(pow(u0_mle(irandeff), 2) + addc * pow(sqrt(SigmaRE(irandeff)), 3), 2);
+          H = -(XR.transpose() * delta * XR) - OmegaRE;
+          H(irandeff, irandeff) += mleterm;
+          if (!std::isfinite(objective) || !gradient.allFinite()){
+            break;
+          }
+          if (gradient.cwiseAbs().maxCoeff() < tol){
+            converged = true;
+            break;
+          }
+
+          Hinv = H.inverse();
+          direction = -(Hinv * gradient);
+          decrease = gradient.dot(direction);
+          if (!direction.allFinite() || !std::isfinite(decrease) || decrease <= 0.0){
+            // A numerator Hessian need not be negative definite away from its mode.
+            // Use a bounded gradient direction if Newton is not a descent direction.
+            direction = gradient / (1.0 + gradient.norm());
+            decrease = gradient.dot(direction);
+          }
+          if (!std::isfinite(decrease) || decrease <= 0.0){
+            break;
+          }
+
+          stepsize = 1.0;
+          accepted = false;
+          objective_tolerance = 16.0 * std::numeric_limits<double>::epsilon() *
+            (1.0 + fabs(objective));
+          for (int ibacktrack = 0; ibacktrack < max_backtrack; ibacktrack++){
+            u1_mle = u0_mle + stepsize * direction;
+            beta_new = b_mean;
+            beta_new.head(n_random_effect) += u1_mle;
+            objective_new = calculate_laplace_objective(Y, X, beta_new, u1_mle,
+              OmegaRE, SigmaRE, n_choice_set, addc, 2, irandeff, prob_new);
+            if (std::isfinite(objective_new) &&
+                objective_new <= objective - 0.0001 * stepsize * decrease + objective_tolerance){
+              u0_mle = u1_mle;
+              accepted = true;
+              break;
+            }
+            stepsize *= 0.5;
+          }
+          if (!accepted){
+            break;
+          }
+        }
+
+        // Re-evaluate the objective, gradient, and Hessian at the accepted point.
+        beta = b_mean;
+        beta.head(n_random_effect) += u0_mle;
+        objective = calculate_laplace_objective(Y, X, beta, u0_mle, OmegaRE,
+          SigmaRE, n_choice_set, addc, 2, irandeff, prob);
+        delta = calculate_delta(prob, n_choice_set);
+        gradient = XR.transpose() * (Y - prob) - OmegaRE * u0_mle;
+        mleterm = 2.0 * u0_mle(irandeff) /
+          (pow(u0_mle(irandeff), 2) + addc * pow(sqrt(SigmaRE(irandeff)), 3));
+        gradient(irandeff) += mleterm;
+        mleterm = 2.0 * (addc * pow(sqrt(SigmaRE(irandeff)), 3) -
+          pow(u0_mle(irandeff), 2)) /
+          pow(pow(u0_mle(irandeff), 2) + addc * pow(sqrt(SigmaRE(irandeff)), 3), 2);
+        H = -(XR.transpose() * delta * XR) - OmegaRE;
+        H(irandeff, irandeff) += mleterm;
+        converged = std::isfinite(objective) && gradient.allFinite() &&
+          gradient.cwiseAbs().maxCoeff() < tol;
+      }
+      if (!converged){
+        Rcpp::stop("Laplace mode solver failed for draw %d, integral type %d, index %d; covariance was not computed.",
+                   iy + 1, 2, irandeff + 1);
+      }
+
+      log_H_det = calculate_laplace_log_determinant(H, iy, 2, irandeff);
+      log_numerator2(irandeff) = -objective - 0.5 * log_H_det;
+    }
+
+    // Common Gaussian normalization constants cancel in these integral ratios.
+    Epy = (log_numerator.array() - log_denom).exp();
+    if (!Epy.allFinite()){
+      Rcpp::stop("Laplace probability integral ratio is not finite for draw %d.", iy + 1);
+    }
+    norm_prob = normalize_probabilities(Epy, n_choice_set);
+    for (int i = 0; i < n_random_effect; i++){
+      Eu2(i) = exp(log_numerator2(i) - log_denom) - addc;
+      if (Eu2(i) < 0.0){
+        Eu2(i) *= -1.0;
+      }
+    }
+    if (!norm_prob.allFinite() || !Eu2.allFinite()){
+      Rcpp::stop("Laplace integral ratio is not finite for draw %d.", iy + 1);
+    }
+
+    score1 = X.transpose() * (Y - norm_prob);
+    score2 = -(SigmaRE.array().rsqrt()) + Eu2.array();
+    I11 += score1 * score1.transpose();
+    I12 += score1 * score2.transpose();
+    I22 += score2 * score2.transpose();
+  }
+
   // Store the final inverse variance-covariance matrix
   Eigen::MatrixXd vcov_inverse = Eigen::MatrixXd::Zero(n_parameter + n_random_effect,
                                                        n_parameter + n_random_effect);
@@ -387,7 +457,7 @@ Eigen::MatrixXd laplace_apply_newton_method(Eigen::MatrixXd Yall,
   // Normalize by number of replicates of Y
   for (int i = 0; i < n_parameter + n_random_effect; i++){
     for (int j = 0; j < n_parameter + n_random_effect; j++){
-      vcov_inverse(i,j) *= 1.0 / n_samples_converged;
+      vcov_inverse(i,j) *= 1.0 / n_samples;
     }
   }
   
@@ -418,6 +488,14 @@ Eigen::MatrixXd laplace_apply_newton_method(Eigen::MatrixXd Yall,
                                      Eigen::VectorXd var_vec,
                                      int n_choice_set){
    
+   if (n_samples <= 0 || n_choice_set <= 0 || X.rows() == 0 ||
+       X.rows() % n_choice_set != 0 || X.rows() / n_choice_set < 2 ||
+       X.cols() != b_mean.size() || var_vec.size() != b_mean.size() ||
+       !X.allFinite() || !b_mean.allFinite() || !var_vec.allFinite() ||
+       (var_vec.array() < 0).any() || !(var_vec.array() > 0).any()){
+     Rcpp::stop("Laplace requires consistent finite inputs, positive sample/choice-set counts, and at least one random effect.");
+   }
+
    // Determine some aspects of the design problem from the inputs
    int n_alternative_total  = X.rows(); // total number of alternatives
    int n_beta               = b_mean.size();
@@ -433,6 +511,10 @@ Eigen::MatrixXd laplace_apply_newton_method(Eigen::MatrixXd Yall,
    
    // How many effects are fixed
    int n_fixed_effect = var_vec.size() - n_random_effect;
+   if (!(var_vec.head(n_random_effect).array() > 0).all()){
+     Rcpp::stop("Laplace requires random-effect columns first; use varcov_approx_PML().");
+   }
+
    
    // Allocate space for final precision about the model parameters
    Eigen::MatrixXd vcov_inverse = Eigen::MatrixXd::Zero(n_beta + n_random_effect,
@@ -440,7 +522,9 @@ Eigen::MatrixXd laplace_apply_newton_method(Eigen::MatrixXd Yall,
    
    
    // Inverse of prior covariance
-   Eigen::MatrixXd Omega = var_vec.array().inverse().matrix().asDiagonal();
+   Eigen::MatrixXd Omega = Eigen::MatrixXd::Zero(n_beta, n_beta);
+   Omega.block(0, 0, n_random_effect, n_random_effect) =
+     var_vec.head(n_random_effect).array().inverse().matrix().asDiagonal();
    
    Eigen::VectorXd Sigma_R = var_vec;
    
@@ -472,7 +556,6 @@ Eigen::MatrixXd laplace_apply_newton_method(Eigen::MatrixXd Yall,
    
    // Allocate intermediate quantities for drawing samples of the outcome vector
    Eigen::VectorXd XB    = Eigen::VectorXd::Zero(X.rows());
-   Eigen::VectorXd expXB = Eigen::VectorXd::Zero(X.rows());
    Eigen::VectorXd prob  = Eigen::VectorXd::Zero(n_alternative_total);
    Eigen::MatrixXd Y     = Eigen::MatrixXd::Zero(X.rows(), n_samples);
    int yind              = 0; // for tracking which y is selected
@@ -482,14 +565,13 @@ Eigen::MatrixXd laplace_apply_newton_method(Eigen::MatrixXd Yall,
      
      // Evaluate linear predictor
      XB    = X * beta.col(iy) + epsilon.col(iy);
-     expXB = XB.array().exp();
      
      // As a starting value, pick the most likely Y for each choice set
      for (int ichoice = 0; ichoice < n_choice_set; ichoice++){
        yind=0;
        // Find the selected value for this choice set
        for (int ialt = 1; ialt < choice_set_size; ialt++){
-         if (expXB(ichoice*choice_set_size + ialt) > expXB(ichoice*choice_set_size + yind)) {
+         if (XB(ichoice*choice_set_size + ialt) > XB(ichoice*choice_set_size + yind)) {
            yind = ialt;
          }
        }
