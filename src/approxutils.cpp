@@ -12,14 +12,12 @@ Eigen::MatrixXd sampleRandomBeta(int n_u,
   
   // Draw random effect samples and calculate corresponding effects (beta)
   // each row is an effect and each column is a sample
-  GetRNGstate();
   Eigen::MatrixXd u = Eigen::MatrixXd::Zero(effect_dim, n_u);
   for (int ip = 0; ip < effect_dim; ip++){
     for (int iu = 0; iu < n_u; iu++){
       u(ip, iu) = R::rnorm(0.0, 1.0);
     }
   }
-  PutRNGstate();
   
   // Generate the observed betas, note that multiplying by sqrt var_vec (0) will fix
   // things up for any fixed effects (u will be 0)
