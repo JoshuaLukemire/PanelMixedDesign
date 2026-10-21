@@ -106,14 +106,12 @@ Eigen::VectorXd impsamp_calc_marginal_prob(Eigen::VectorXd Y,
    Eigen::MatrixXd u = Eigen::MatrixXd::Zero(n_random_effect, n_samples_u);
    Eigen::MatrixXd beta_i = Eigen::MatrixXd::Zero(effect_dim, n_samples_u);
    Eigen::VectorXd sd_vec = Eigen::VectorXd::Zero(n_random_effect);
-   GetRNGstate();
    for (int ip = 0; ip < n_random_effect; ip++){
      sd_vec(ip) = sqrt(var_vec(ip));
      for (int iu = 0; iu < n_samples_u; iu++){
        u(ip, iu) = R::rnorm(0.0, 1.0);
      }
    }
-   PutRNGstate();
    Eigen::MatrixXd sd_mat = sd_vec.asDiagonal();
    
    // Use the random draws to get the samples of the coefficients
