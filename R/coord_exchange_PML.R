@@ -238,25 +238,6 @@ coord_exchange_PML <- function(n_choice_set,
             ((current_choice_set_index-1)*n_alternative+1):(current_choice_set_index*n_alternative),]
           if (any(duplicated(current_choice_set))){next}
           
-          # Check that flipping to this setting does not cause a loss of ability to
-          # estimate the corresponding parameter (due to it being the same wn each 
-          # choice set). First, only need to check this if it is a potential
-          # problem within this choice set
-          uniqueness_problem <- TRUE
-          if (all(current_choice_set[,j] == l)){
-            # If it is a potential problem, run a comparison against all
-            # other choice sets
-            for (iCS in 1:n_choice_set){
-              current_choice_set_vals <- new_design[
-                ((iCS-1)*n_alternative+1):(iCS*n_alternative), j] 
-              if (length(unique(current_choice_set_vals)) > 1){
-                uniqueness_problem <- FALSE
-              }
-            }
-          }
-          if (uniqueness_problem == TRUE){next}
-          
-          
           # Get the corresponding model matrix conversion
           modmatnew=stats::model.matrix(~.,new_design,contrasts=contr)[,-1] # coded matrix of new        result1 = fi(modmat)
           
@@ -278,7 +259,7 @@ coord_exchange_PML <- function(n_choice_set,
               new_criterion = Inf
             } else{
               if (optcrit == "A"){
-                new_criterion=sum(eigen(solve(var_cov_matrix_proposal))$values)/nrow(var_cov_matrix_proposal)
+                new_criterion=sum(diag(var_cov_matrix_proposal))/nrow(var_cov_matrix_proposal)
                 if(new_criterion < 0){
                   new_criterion = Inf
                 }
